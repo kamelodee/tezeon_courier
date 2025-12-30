@@ -67,7 +67,11 @@ const LoginScreen = ({ navigation }) => {
                     {/* Logo & Title */}
                     <View style={styles.header}>
                         <View style={styles.logoContainer}>
-                            <Ionicons name="bicycle" size={60} color={COLORS.primary} />
+                            <Image
+                                source={require('../../assets/logo.png')}
+                                style={styles.logo}
+                                resizeMode="contain"
+                            />
                         </View>
                         <Text style={styles.title}>Tezeon Courier</Text>
                         <Text style={styles.subtitle}>Deliver with us</Text>
@@ -152,13 +156,22 @@ const styles = StyleSheet.create({
         marginBottom: 40,
     },
     logoContainer: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        backgroundColor: `${COLORS.primary}15`,
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        backgroundColor: COLORS.white,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 16,
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
+    logo: {
+        width: 80,
+        height: 80,
     },
     title: {
         fontSize: 28,
