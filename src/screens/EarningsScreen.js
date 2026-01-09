@@ -89,7 +89,7 @@ const EarningsScreen = () => {
                 ]}>
                     {item.type === 'deduction' || item.type === 'payout' ? '-' : '+'}₵{parseFloat(item.amount).toFixed(2)}
                 </Text>
-                {item.is_paid && (
+                {!!item.is_paid && (
                     <View style={styles.paidBadge}>
                         <Text style={styles.paidText}>Paid</Text>
                     </View>
@@ -121,7 +121,7 @@ const EarningsScreen = () => {
                 keyExtractor={(item) => item.id?.toString()}
                 contentContainerStyle={styles.listContent}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
+                    <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
                 }
                 ListHeaderComponent={
                     <View>

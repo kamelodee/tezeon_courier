@@ -20,7 +20,11 @@ const ProfileScreen = ({ navigation }) => {
 
     useEffect(() => {
         loadProfile();
-    }, []);
+        const unsubscribe = navigation.addListener('focus', () => {
+            loadProfile();
+        });
+        return unsubscribe;
+    }, [navigation]);
 
     const loadProfile = async () => {
         try {
@@ -160,6 +164,12 @@ const ProfileScreen = ({ navigation }) => {
                             </View>
                         )}
                     </View>
+                    {profile?.license_number ? (
+                        <View style={styles.licenseInfo}>
+                            <Ionicons name="card-outline" size={16} color={COLORS.muted} />
+                            <Text style={styles.licenseText}>License: {profile.license_number}</Text>
+                        </View>
+                    ) : null}
                 </View>
 
                 {/* Menu Items */}
@@ -169,7 +179,14 @@ const ProfileScreen = ({ navigation }) => {
                         <MenuItem
                             icon="person-outline"
                             title="Edit Profile"
-                            onPress={() => { }}
+                            onPress={() => navigation.navigate('EditProfile', { profile })}
+                        />
+                        <MenuItem
+                            icon="shield-checkmark-outline"
+                            title="Identity & Verification"
+                            subtitle={profile?.is_verified ? "Verified Account" : "Action required"}
+                            onPress={() => navigation.navigate('Verification', { profile })}
+                            color={profile?.is_verified ? COLORS.success : COLORS.warning}
                         />
                         <MenuItem
                             icon="wallet-outline"
@@ -188,7 +205,7 @@ const ProfileScreen = ({ navigation }) => {
                         <MenuItem
                             icon="time-outline"
                             title="Delivery History"
-                            onPress={() => navigation.navigate('Deliveries')}
+                            onPress={() => navigation.navigate('Deliveries', { filter: 'history' })}
                         />
                     </View>
                 </View>
@@ -204,7 +221,7 @@ const ProfileScreen = ({ navigation }) => {
                         <MenuItem
                             icon="location-outline"
                             title="Location Settings"
-                            onPress={() => { }}
+                            onPress={() => navigation.navigate('LocationSettings')}
                         />
                         <MenuItem
                             icon="help-circle-outline"
@@ -319,6 +336,16 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     verifiedText: { fontSize: 12, fontWeight: '600', color: COLORS.success },
+    licenseInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 12,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
+        gap: 8
+    },
+    licenseText: { fontSize: 14, color: COLORS.muted, fontWeight: '500' },
 
     menuCard: { backgroundColor: COLORS.white, borderRadius: 12, overflow: 'hidden' },
     menuItem: {

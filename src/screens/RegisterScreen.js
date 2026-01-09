@@ -22,14 +22,20 @@ const RegisterScreen = ({ navigation }) => {
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [vehicleType, setVehicleType] = useState('motorcycle');
     const [vehicleNumber, setVehicleNumber] = useState('');
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
     const handleRegister = async () => {
-        if (!firstName || !lastName || !email || !phone || !password || !vehicleType) {
+        if (!firstName || !lastName || !email || !phone || !password || !confirmPassword || !vehicleType) {
             Alert.alert('Error', 'Please fill in all required fields');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            Alert.alert('Error', 'Passwords do not match');
             return;
         }
 
@@ -41,6 +47,8 @@ const RegisterScreen = ({ navigation }) => {
                 email,
                 phone,
                 password,
+                password_confirm: confirmPassword,
+                user_type: 'courier',
                 vehicle_type: vehicleType,
                 vehicle_number: vehicleNumber
             };
@@ -49,14 +57,19 @@ const RegisterScreen = ({ navigation }) => {
             if (response.success) {
                 Alert.alert(
                     'Success',
-                    'Registration successful! Your account is pending approval.',
+                    'Registration successful! Please sign in to access your dashboard.',
                     [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
                 );
             } else {
-                Alert.alert('Registration Failed', response.error || 'Please try again');
+                // Handle 500 errors or other server failures gracefully
+                const errorMsg = response.error?.includes('invalid response format')
+                    ? 'The server encountered an error. We are trying to fix it. Please try again later.'
+                    : response.error;
+                Alert.alert('Registration Failed', errorMsg || 'Please try again');
             }
         } catch (error) {
-            Alert.alert('Error', 'An error occurred. Please try again.');
+            console.error('Registration screen error:', error);
+            Alert.alert('Error', 'An unexpected error occurred. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -160,6 +173,17 @@ const RegisterScreen = ({ navigation }) => {
                             </TouchableOpacity>
                         </View>
 
+                        <View style={styles.inputContainer}>
+                            <Ionicons name="lock-closed-outline" size={20} color={COLORS.muted} style={styles.inputIcon} />
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Confirm Password"
+                                value={confirmPassword}
+                                onChangeText={setConfirmPassword}
+                                secureTextEntry={!showPassword}
+                            />
+                        </View>
+
                         <Text style={styles.sectionTitle}>Select Vehicle Type</Text>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.vehicleScroll}>
                             <VehicleOption type="motorcycle" label="Motorcycle" icon="bicycle" />
@@ -182,7 +206,7 @@ const RegisterScreen = ({ navigation }) => {
                         <TouchableOpacity
                             style={[styles.registerButton, loading && styles.buttonDisabled]}
                             onPress={handleRegister}
-                            disabled={loading}
+                            disabled={!!loading}
                         >
                             {loading ? (
                                 <ActivityIndicator color="#fff" />

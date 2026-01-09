@@ -10,13 +10,19 @@ import {
     Linking,
     TextInput,
     Modal,
-    Image
+    Image,
+    Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../theme/colors';
+import { hp } from '../utils/responsive';
 import courierApi from '../services/courierApi';
 import * as ImagePicker from 'expo-image-picker';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from '../components/Map';
+import * as Location from 'expo-location';
+import SignatureScreen from 'react-native-signature-canvas';
+import * as FileSystem from 'expo-file-system';
 
 const DeliveryDetailsScreen = ({ route, navigation }) => {
     const { deliveryId } = route.params;
@@ -26,13 +32,46 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
     const [showCompleteModal, setShowCompleteModal] = useState(false);
     const [showFailModal, setShowFailModal] = useState(false);
     const [recipientName, setRecipientName] = useState('');
+    const [deliveryCode, setDeliveryCode] = useState('');
     const [deliveryNotes, setDeliveryNotes] = useState('');
     const [failureReason, setFailureReason] = useState('');
     const [deliveryPhoto, setDeliveryPhoto] = useState(null);
+    const [recipientSignature, setRecipientSignature] = useState(null);
+    const [courierLocation, setCourierLocation] = useState(null);
 
     useEffect(() => {
         loadDeliveryDetails();
+        loadCourierLocation();
     }, [deliveryId]);
+
+    const loadCourierLocation = async () => {
+        try {
+            let { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') return;
+
+            let location = await Location.getCurrentPositionAsync({});
+            setCourierLocation({
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude
+            });
+        } catch (error) {
+            console.log('Error getting location:', error);
+        }
+    };
+
+    const calculateDistance = (lat1, lon1, lat2, lon2) => {
+        if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+        const R = 6371; // Radius of the earth in km
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const d = R * c; // Distance in km
+        return d.toFixed(1);
+    };
 
     const loadDeliveryDetails = async () => {
         try {
@@ -82,11 +121,32 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
         }
     };
 
+    const handleSignature = (signature) => {
+        setRecipientSignature(signature);
+    };
+
     const handleComplete = async () => {
+        if (!recipientName) {
+            Alert.alert('Error', 'Please enter recipient name');
+            return;
+        }
+
+        // Keystone: Validate OTP
+        if (!deliveryCode || deliveryCode.length !== 4) {
+            Alert.alert('Invalid Code', 'Please enter the 4-digit Delivery Code provided by the customer.');
+            return;
+        }
+
+        if (!recipientSignature && !deliveryPhoto) {
+            Alert.alert('Proof Required', 'Please provide either a signature or a photo proof.');
+            return;
+        }
+
         setActionLoading(true);
         try {
             const formData = new FormData();
             formData.append('recipient_name', recipientName);
+            formData.append('delivery_code', deliveryCode); // Send OTP
             formData.append('notes', deliveryNotes);
 
             if (deliveryPhoto) {
@@ -94,6 +154,21 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                     uri: deliveryPhoto,
                     type: 'image/jpeg',
                     name: 'delivery_proof.jpg'
+                });
+            }
+
+            if (recipientSignature) {
+                // Remove the 'data:image/png;base64,' part
+                const base64Code = recipientSignature.split(',')[1];
+                const filename = FileSystem.cacheDirectory + 'signature.png';
+                await FileSystem.writeAsStringAsync(filename, base64Code, {
+                    encoding: FileSystem.EncodingType.Base64,
+                });
+
+                formData.append('recipient_signature', {
+                    uri: filename,
+                    type: 'image/png',
+                    name: 'signature.png'
                 });
             }
 
@@ -107,7 +182,8 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                 Alert.alert('Error', response.data?.error || 'Failed to complete delivery');
             }
         } catch (error) {
-            Alert.alert('Error', 'An error occurred');
+            console.error('Complete delivery error:', error);
+            Alert.alert('Error', 'An error occurred during completion');
         } finally {
             setActionLoading(false);
         }
@@ -156,12 +232,31 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
         }
     };
 
-    const openMaps = () => {
-        if (delivery?.delivery_latitude && delivery?.delivery_longitude) {
-            const url = `https://www.google.com/maps/dir/?api=1&destination=${delivery.delivery_latitude},${delivery.delivery_longitude}`;
-            Linking.openURL(url);
-        } else if (delivery?.delivery_address) {
-            const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(delivery.delivery_address)}`;
+    const openInMaps = (lat, lng, address) => {
+        const scheme = Platform.select({ ios: 'maps:0,0?q=', android: 'geo:0,0?q=' });
+        const latLng = `${lat},${lng}`;
+        const label = encodeURIComponent(address);
+
+        let url = '';
+        if (lat && lng) {
+            url = Platform.select({
+                ios: `${scheme}${label}@${latLng}`,
+                android: `${scheme}${latLng}(${label})`
+            });
+            // Fallback for Google Maps if preferred
+            const googleUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+
+            Alert.alert(
+                'Navigate',
+                'Choose your maps application',
+                [
+                    { text: 'Default Maps', onPress: () => Linking.openURL(url) },
+                    { text: 'Google Maps', onPress: () => Linking.openURL(googleUrl) },
+                    { text: 'Cancel', style: 'cancel' }
+                ]
+            );
+        } else if (address) {
+            url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
             Linking.openURL(url);
         }
     };
@@ -220,13 +315,108 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
             </View>
 
             <ScrollView style={styles.content}>
-                {/* Status Card */}
+                {/* MarketPlace Offered Price Banner */}
+                {delivery?.status === 'pending' && delivery?.is_marketplace && (
+                    <View style={styles.marketplaceBanner}>
+                        <View style={styles.priceContainer}>
+                            <Text style={styles.priceLabel}>Offered Earnings</Text>
+                            <Text style={styles.priceValue}>₵{parseFloat(delivery.offered_price || 0).toFixed(2)}</Text>
+                        </View>
+                        <View style={styles.marketBadge}>
+                            <Ionicons name="globe" size={16} color={COLORS.white} />
+                            <Text style={styles.marketText}>MARKETPLACE JOB</Text>
+                        </View>
+                    </View>
+                )}
                 <View style={styles.statusCard}>
                     <View style={[styles.statusBadge, { backgroundColor: getStatusColor(delivery?.status) }]}>
                         <Text style={styles.statusText}>{delivery?.status?.replace('_', ' ').toUpperCase()}</Text>
                     </View>
                     <Text style={styles.orderNumber}>{delivery?.order_number}</Text>
                     <Text style={styles.earning}>Earn: ₵{parseFloat(delivery?.courier_earning || 0).toFixed(2)}</Text>
+                </View>
+
+                {/* Route Summary & Map */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>ROUTE SUMMARY</Text>
+                    <View style={styles.routeSummaryCard}>
+                        <View style={styles.summaryItem}>
+                            <Ionicons name="bicycle" size={20} color={COLORS.primary} />
+                            <View style={styles.summaryContent}>
+                                <Text style={styles.summaryLabel}>To Pickup</Text>
+                                <Text style={styles.summaryValue}>
+                                    {courierLocation && delivery?.pickup_latitude ?
+                                        `${calculateDistance(courierLocation.latitude, courierLocation.longitude, delivery.pickup_latitude, delivery.pickup_longitude)} km` :
+                                        '--'
+                                    }
+                                </Text>
+                            </View>
+                        </View>
+                        <View style={styles.summaryDivider} />
+                        <View style={styles.summaryItem}>
+                            <Ionicons name="location" size={20} color={COLORS.error} />
+                            <View style={styles.summaryContent}>
+                                <Text style={styles.summaryLabel}>Total Delivery</Text>
+                                <Text style={styles.summaryValue}>
+                                    {delivery?.pickup_latitude && delivery?.delivery_latitude ?
+                                        `${calculateDistance(delivery.pickup_latitude, delivery.pickup_longitude, delivery.delivery_latitude, delivery.delivery_longitude)} km` :
+                                        '--'
+                                    }
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+
+                    <View style={styles.mapWrapper}>
+                        <MapView
+                            provider={PROVIDER_GOOGLE}
+                            style={styles.map}
+                            initialRegion={{
+                                latitude: parseFloat(delivery?.pickup_latitude || 0),
+                                longitude: parseFloat(delivery?.pickup_longitude || 0),
+                                latitudeDelta: 0.05,
+                                longitudeDelta: 0.05,
+                            }}
+                        >
+                            {courierLocation && (
+                                <Marker
+                                    coordinate={courierLocation}
+                                    title="You"
+                                    pinColor={COLORS.secondary}
+                                />
+                            )}
+                            {delivery?.pickup_latitude && (
+                                <Marker
+                                    coordinate={{
+                                        latitude: parseFloat(delivery.pickup_latitude),
+                                        longitude: parseFloat(delivery.pickup_longitude)
+                                    }}
+                                    title="Pickup"
+                                    pinColor={COLORS.primary}
+                                />
+                            )}
+                            {delivery?.delivery_latitude && (
+                                <Marker
+                                    coordinate={{
+                                        latitude: parseFloat(delivery.delivery_latitude),
+                                        longitude: parseFloat(delivery.delivery_longitude)
+                                    }}
+                                    title="Delivery"
+                                    pinColor={COLORS.error}
+                                />
+                            )}
+                            {delivery?.pickup_latitude && delivery?.delivery_latitude && (
+                                <Polyline
+                                    coordinates={[
+                                        { latitude: parseFloat(delivery.pickup_latitude), longitude: parseFloat(delivery.pickup_longitude) },
+                                        { latitude: parseFloat(delivery.delivery_latitude), longitude: parseFloat(delivery.delivery_longitude) }
+                                    ]}
+                                    strokeColor={COLORS.primary}
+                                    strokeWidth={3}
+                                />
+                            )}
+                        </MapView>
+                    </View>
                 </View>
 
                 {/* Customer Info */}
@@ -253,10 +443,37 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                     </View>
                 </View>
 
+                {/* Pickup Address */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>PICKUP ADDRESS</Text>
+                    <TouchableOpacity
+                        style={styles.addressCard}
+                        onPress={() => openInMaps(delivery?.pickup_latitude, delivery?.pickup_longitude, delivery?.pickup_address)}
+                    >
+                        <View style={styles.addressContent}>
+                            <Ionicons name="business" size={24} color={COLORS.primary} />
+                            <Text style={styles.addressText}>{delivery?.pickup_address || 'Seller Location'}</Text>
+                        </View>
+                        <View style={styles.navigateButton}>
+                            <Ionicons name="navigate" size={20} color={COLORS.white} />
+                            <Text style={styles.navigateText}>Navigate</Text>
+                        </View>
+                    </TouchableOpacity>
+                    {delivery?.pickup_contact_phone ? (
+                        <TouchableOpacity style={styles.pickupContact} onPress={() => Linking.openURL(`tel:${delivery.pickup_contact_phone}`)}>
+                            <Ionicons name="call" size={16} color={COLORS.success} />
+                            <Text style={styles.pickupContactText}>Call Seller: {delivery.pickup_contact_phone}</Text>
+                        </TouchableOpacity>
+                    ) : null}
+                </View>
+
                 {/* Delivery Address */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>DELIVERY ADDRESS</Text>
-                    <TouchableOpacity style={styles.addressCard} onPress={openMaps}>
+                    <TouchableOpacity
+                        style={styles.addressCard}
+                        onPress={() => openInMaps(delivery?.delivery_latitude, delivery?.delivery_longitude, delivery?.delivery_address)}
+                    >
                         <View style={styles.addressContent}>
                             <Ionicons name="location" size={24} color={COLORS.error} />
                             <Text style={styles.addressText}>{delivery?.delivery_address}</Text>
@@ -354,7 +571,7 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                                 handleAction(nextAction.action);
                             }
                         }}
-                        disabled={actionLoading}
+                        disabled={!!actionLoading}
                     >
                         {actionLoading ? (
                             <ActivityIndicator color="#fff" />
@@ -369,7 +586,7 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
             )}
 
             {/* Complete Modal */}
-            <Modal visible={showCompleteModal} animationType="slide" transparent>
+            <Modal visible={!!showCompleteModal} animationType="slide" transparent={true}>
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <Text style={styles.modalTitle}>Complete Delivery</Text>
@@ -381,24 +598,77 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                             onChangeText={setRecipientName}
                         />
 
+                        {/* Keystone: OTP Entry */}
+                        <View style={{ marginBottom: 16 }}>
+                            <Text style={{ fontSize: 12, color: COLORS.muted, marginBottom: 4, marginLeft: 4 }}>Ask Customer for Delivery Code</Text>
+                            <TextInput
+                                style={[styles.modalInput, { fontSize: 24, textAlign: 'center', letterSpacing: 8, fontWeight: 'bold', borderColor: COLORS.primary }]}
+                                placeholder="0 0 0 0"
+                                value={deliveryCode}
+                                onChangeText={setDeliveryCode}
+                                keyboardType="number-pad"
+                                maxLength={4}
+                            />
+                        </View>
+
                         <TextInput
-                            style={[styles.modalInput, { height: 80 }]}
+                            style={[styles.modalInput, { height: 60 }]}
                             placeholder="Delivery Notes (optional)"
                             value={deliveryNotes}
                             onChangeText={setDeliveryNotes}
                             multiline
                         />
 
-                        <TouchableOpacity style={styles.photoButton} onPress={pickImage}>
-                            {deliveryPhoto ? (
-                                <Image source={{ uri: deliveryPhoto }} style={styles.photoPreview} />
+                        <View style={styles.proofContainer}>
+                            <TouchableOpacity
+                                style={[styles.proofToggle, !recipientSignature && styles.proofToggleActive]}
+                                onPress={() => setRecipientSignature(null)}
+                            >
+                                <Ionicons name="camera" size={20} color={!recipientSignature ? COLORS.white : COLORS.muted} />
+                                <Text style={[styles.proofToggleText, !recipientSignature && styles.proofToggleTextActive]}>Photo</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.proofToggle, !!recipientSignature && styles.proofToggleActive]}
+                                onPress={() => { }} // Controlled by canvas
+                            >
+                                <Ionicons name="pencil" size={20} color={!!recipientSignature ? COLORS.white : COLORS.muted} />
+                                <Text style={[styles.proofToggleText, !!recipientSignature && styles.proofToggleTextActive]}>Signature</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.proofContent}>
+                            {recipientSignature ? (
+                                <View style={styles.signaturePreviewContainer}>
+                                    <Image source={{ uri: recipientSignature }} style={styles.signaturePreview} resizeMode="contain" />
+                                    <TouchableOpacity style={styles.clearSignature} onPress={() => setRecipientSignature(null)}>
+                                        <Text style={styles.clearSignatureText}>Clear Signature</Text>
+                                    </TouchableOpacity>
+                                </View>
                             ) : (
-                                <>
-                                    <Ionicons name="camera" size={32} color={COLORS.muted} />
-                                    <Text style={styles.photoButtonText}>Take Proof Photo</Text>
-                                </>
+                                <View style={styles.signatureWrapper}>
+                                    <SignatureScreen
+                                        onOK={handleSignature}
+                                        onEmpty={() => console.log('Empty')}
+                                        descriptionText="Sign Here"
+                                        clearText="Clear"
+                                        confirmText="Save"
+                                        webStyle={`.m-signature-pad--footer {display: none; margin: 0px;}`}
+                                        autoSize={true}
+                                    />
+                                </View>
                             )}
-                        </TouchableOpacity>
+
+                            <TouchableOpacity style={styles.photoButtonSmall} onPress={pickImage}>
+                                {deliveryPhoto ? (
+                                    <Image source={{ uri: deliveryPhoto }} style={styles.photoPreviewSmall} />
+                                ) : (
+                                    <>
+                                        <Ionicons name="camera" size={24} color={COLORS.muted} />
+                                        <Text style={styles.photoButtonTextSmall}>Add Photo Proof (Optional)</Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+                        </View>
 
                         <View style={styles.modalButtons}>
                             <TouchableOpacity
@@ -408,9 +678,9 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                                 <Text style={styles.modalCancelText}>Cancel</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.modalConfirm, actionLoading && { opacity: 0.7 }]}
+                                style={[styles.modalConfirm, !!actionLoading && { opacity: 0.7 }]}
                                 onPress={handleComplete}
-                                disabled={actionLoading}
+                                disabled={!!actionLoading}
                             >
                                 {actionLoading ? (
                                     <ActivityIndicator color="#fff" />
@@ -424,7 +694,7 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
             </Modal>
 
             {/* Fail Modal */}
-            <Modal visible={showFailModal} animationType="slide" transparent>
+            <Modal visible={!!showFailModal} animationType="slide" transparent={true}>
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <Text style={styles.modalTitle}>Mark as Failed</Text>
@@ -445,9 +715,9 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                                 <Text style={styles.modalCancelText}>Cancel</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.modalConfirm, { backgroundColor: COLORS.error }, actionLoading && { opacity: 0.7 }]}
+                                style={[styles.modalConfirm, { backgroundColor: COLORS.error }, !!actionLoading && { opacity: 0.7 }]}
                                 onPress={handleFail}
-                                disabled={actionLoading}
+                                disabled={!!actionLoading}
                             >
                                 {actionLoading ? (
                                     <ActivityIndicator color="#fff" />
@@ -491,6 +761,38 @@ const styles = StyleSheet.create({
     orderNumber: { fontSize: 18, fontWeight: 'bold', color: COLORS.text, marginTop: 12 },
     earning: { fontSize: 24, fontWeight: 'bold', color: COLORS.success, marginTop: 8 },
 
+    marketplaceBanner: {
+        backgroundColor: '#4A148C',
+        padding: 20,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        borderBottomWidth: 4,
+        borderBottomColor: '#7B1FA2'
+    },
+    priceContainer: {},
+    priceLabel: { fontSize: 12, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 1 },
+    priceValue: { fontSize: 32, fontWeight: 'bold', color: COLORS.white, marginTop: 4 },
+    marketBadge: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 6 },
+    marketText: { color: COLORS.white, fontSize: 11, fontWeight: 'bold' },
+
+    routeSummaryCard: {
+        backgroundColor: COLORS.white,
+        borderRadius: 12,
+        padding: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 12
+    },
+    summaryItem: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+    summaryContent: {},
+    summaryLabel: { fontSize: 10, color: COLORS.muted, textTransform: 'uppercase' },
+    summaryValue: { fontSize: 16, fontWeight: 'bold', color: COLORS.text, marginTop: 2 },
+    summaryDivider: { width: 1, height: 30, backgroundColor: COLORS.border, marginHorizontal: 10 },
+    mapWrapper: { height: hp('30%'), borderRadius: 12, overflow: 'hidden', backgroundColor: COLORS.border },
+    map: { ...StyleSheet.absoluteFillObject },
+
     section: { padding: 16, paddingBottom: 0 },
     sectionTitle: { fontSize: 11, fontWeight: '600', color: COLORS.muted, marginBottom: 8, letterSpacing: 0.5 },
 
@@ -505,6 +807,8 @@ const styles = StyleSheet.create({
     addressText: { flex: 1, fontSize: 14, color: COLORS.text, marginLeft: 12, lineHeight: 20 },
     navigateButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primary, paddingVertical: 12, borderRadius: 8, gap: 8 },
     navigateText: { color: COLORS.white, fontWeight: '600' },
+    pickupContact: { flexDirection: 'row', alignItems: 'center', marginTop: 12, backgroundColor: `${COLORS.success}10`, padding: 10, borderRadius: 8, gap: 8 },
+    pickupContactText: { color: COLORS.success, fontSize: 13, fontWeight: '600' },
 
     instructionsCard: { flexDirection: 'row', backgroundColor: `${COLORS.warning}15`, borderRadius: 12, padding: 16, gap: 12 },
     instructionsText: { flex: 1, fontSize: 14, color: COLORS.text },
@@ -575,6 +879,21 @@ const styles = StyleSheet.create({
     modalCancelText: { color: COLORS.text, fontWeight: '600' },
     modalConfirm: { flex: 1, backgroundColor: COLORS.primary, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
     modalConfirmText: { color: COLORS.white, fontWeight: '600' },
+
+    proofContainer: { flexDirection: 'row', backgroundColor: COLORS.background, borderRadius: 12, padding: 4, marginBottom: 16 },
+    proofToggle: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 10, gap: 8 },
+    proofToggleActive: { backgroundColor: COLORS.primary },
+    proofToggleText: { fontSize: 13, fontWeight: '600', color: COLORS.muted },
+    proofToggleTextActive: { color: COLORS.white },
+    proofContent: { gap: 16, marginBottom: 20 },
+    signatureWrapper: { height: 180, backgroundColor: COLORS.white, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, overflow: 'hidden' },
+    signaturePreviewContainer: { height: 180, backgroundColor: COLORS.white, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
+    signaturePreview: { width: '100%', height: 120 },
+    clearSignature: { padding: 8 },
+    clearSignatureText: { color: COLORS.error, fontSize: 13, fontWeight: '600' },
+    photoButtonSmall: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.background, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: COLORS.border, borderStyle: 'dashed', gap: 10 },
+    photoButtonTextSmall: { color: COLORS.muted, fontSize: 13 },
+    photoPreviewSmall: { width: 60, height: 40, borderRadius: 4 },
 });
 
 export default DeliveryDetailsScreen;

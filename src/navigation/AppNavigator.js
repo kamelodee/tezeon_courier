@@ -8,7 +8,11 @@ import { COLORS } from '../theme/colors';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import DeliveryDetailsScreen from '../screens/DeliveryDetailsScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
+import VerificationScreen from '../screens/VerificationScreen';
+import LocationSettingsScreen from '../screens/LocationSettingsScreen';
 import MainTabNavigator from './MainTabNavigator';
+import courierApi from '../services/courierApi';
 
 const Stack = createStackNavigator();
 
@@ -18,6 +22,15 @@ const AppNavigator = () => {
 
     useEffect(() => {
         checkAuth();
+
+        // Listen for unauthorized status to logout globally
+        courierApi.onUnauthorized = () => {
+            setIsLoggedIn(false);
+        };
+
+        return () => {
+            courierApi.onUnauthorized = null;
+        };
     }, []);
 
     const checkAuth = async () => {
@@ -51,6 +64,21 @@ const AppNavigator = () => {
                 <Stack.Screen
                     name="DeliveryDetails"
                     component={DeliveryDetailsScreen}
+                    options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                    name="EditProfile"
+                    component={EditProfileScreen}
+                    options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                    name="Verification"
+                    component={VerificationScreen}
+                    options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                    name="LocationSettings"
+                    component={LocationSettingsScreen}
                     options={{ headerShown: false }}
                 />
             </Stack.Navigator>
