@@ -39,11 +39,19 @@ const formatValidationErrors = (errorData) => {
     if (errorData.detail) return errorData.detail;
     if (errorData.error) return errorData.error;
 
+    // Handle non_field_errors specially - these are general errors without field names
+    if (errorData.non_field_errors) {
+        const errors = Array.isArray(errorData.non_field_errors)
+            ? errorData.non_field_errors
+            : [errorData.non_field_errors];
+        return errors[0]; // Return the first general error directly
+    }
+
     // Handle field-specific validation errors
     const errorMessages = [];
 
     for (const [field, errors] of Object.entries(errorData)) {
-        if (field === 'code' || field === 'status') continue;
+        if (field === 'code' || field === 'status' || field === 'non_field_errors') continue;
 
         const fieldName = formatFieldName(field);
         const errorList = Array.isArray(errors) ? errors : [errors];
