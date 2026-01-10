@@ -10,31 +10,78 @@ const COURIER_URL = `/courier`;
 
 // User-friendly error messages mapping
 const USER_FRIENDLY_ERRORS = {
-    'network': 'Unable to connect to the server. Please check your internet connection.',
+    'network': 'Unable to connect. Please check your internet connection.',
     'unauthorized': 'Your session has expired. Please log in again.',
-    'not_found': 'The requested resource was not found.',
+    'not_found': 'The requested information was not found.',
     'server_error': 'Something went wrong on our end. Please try again later.',
     'validation': 'Please check your input and try again.',
-    'default': 'An unexpected error occurred. Please try again.',
+    'default': 'Something went wrong. Please try again.',
+};
+
+// Format field name to be human readable (snake_case -> Title Case)
+const formatFieldName = (field) => {
+    if (!field) return '';
+    return field
+        .replace(/_/g, ' ')
+        .replace(/([A-Z])/g, ' $1')
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ')
+        .trim();
+};
+
+// Format validation errors from backend into readable messages
+const formatValidationErrors = (errorData) => {
+    if (!errorData || typeof errorData !== 'object') return null;
+
+    // If it's a simple message/detail response
+    if (errorData.message) return errorData.message;
+    if (errorData.detail) return errorData.detail;
+    if (errorData.error) return errorData.error;
+
+    // Handle field-specific validation errors
+    const errorMessages = [];
+
+    for (const [field, errors] of Object.entries(errorData)) {
+        if (field === 'code' || field === 'status') continue;
+
+        const fieldName = formatFieldName(field);
+        const errorList = Array.isArray(errors) ? errors : [errors];
+
+        for (const error of errorList) {
+            if (typeof error === 'string') {
+                let friendlyError = error;
+                if (error.toLowerCase().includes('this field is required')) {
+                    friendlyError = 'is required';
+                } else if (error.toLowerCase().includes('already exists')) {
+                    friendlyError = 'is already taken';
+                } else if (error.toLowerCase().includes('invalid')) {
+                    friendlyError = 'is not valid';
+                }
+                errorMessages.push(`${fieldName} ${friendlyError}`);
+            }
+        }
+    }
+
+    if (errorMessages.length === 0) return null;
+    if (errorMessages.length === 1) return errorMessages[0];
+    return errorMessages.slice(0, 3).join('. ') + (errorMessages.length > 3 ? '...' : '');
 };
 
 // Helper to get user-friendly message from error
 const getUserFriendlyError = (error, statusCode) => {
     if (!error && !statusCode) return USER_FRIENDLY_ERRORS.default;
 
-    // Check for network errors
     if (error?.message?.includes('Network') || error?.message?.includes('fetch')) {
         return USER_FRIENDLY_ERRORS.network;
     }
 
-    // Map HTTP status codes to friendly messages
     if (statusCode === 401) return USER_FRIENDLY_ERRORS.unauthorized;
     if (statusCode === 404) return USER_FRIENDLY_ERRORS.not_found;
     if (statusCode >= 500) return USER_FRIENDLY_ERRORS.server_error;
     if (statusCode === 400) return USER_FRIENDLY_ERRORS.validation;
 
-    // If error has a user-friendly message field, use it
-    if (error?.message && !error.message.includes('HTTP Error') && error.message.length < 100) {
+    if (error?.message && !error.message.includes('HTTP Error') && error.message.length < 150) {
         return error.message;
     }
 
