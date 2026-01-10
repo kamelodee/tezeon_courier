@@ -8,6 +8,39 @@ import { API_BASE_URL } from '../constants/api';
 
 const COURIER_URL = `/courier`;
 
+// User-friendly error messages mapping
+const USER_FRIENDLY_ERRORS = {
+    'network': 'Unable to connect to the server. Please check your internet connection.',
+    'unauthorized': 'Your session has expired. Please log in again.',
+    'not_found': 'The requested resource was not found.',
+    'server_error': 'Something went wrong on our end. Please try again later.',
+    'validation': 'Please check your input and try again.',
+    'default': 'An unexpected error occurred. Please try again.',
+};
+
+// Helper to get user-friendly message from error
+const getUserFriendlyError = (error, statusCode) => {
+    if (!error && !statusCode) return USER_FRIENDLY_ERRORS.default;
+
+    // Check for network errors
+    if (error?.message?.includes('Network') || error?.message?.includes('fetch')) {
+        return USER_FRIENDLY_ERRORS.network;
+    }
+
+    // Map HTTP status codes to friendly messages
+    if (statusCode === 401) return USER_FRIENDLY_ERRORS.unauthorized;
+    if (statusCode === 404) return USER_FRIENDLY_ERRORS.not_found;
+    if (statusCode >= 500) return USER_FRIENDLY_ERRORS.server_error;
+    if (statusCode === 400) return USER_FRIENDLY_ERRORS.validation;
+
+    // If error has a user-friendly message field, use it
+    if (error?.message && !error.message.includes('HTTP Error') && error.message.length < 100) {
+        return error.message;
+    }
+
+    return USER_FRIENDLY_ERRORS.default;
+};
+
 class CourierAPI {
     constructor(baseURL) {
         this.baseURL = baseURL;
@@ -43,12 +76,13 @@ class CourierAPI {
         };
 
         try {
-            console.log(`📡 API Request: ${config.method || 'GET'} ${url}`);
+            // Only log in development
+            if (__DEV__) console.log(`📡 API Request: ${config.method || 'GET'} ${url}`);
             const response = await fetch(url, config);
 
             // Handle 401 Unauthorized - Attempt Token Refresh
             if (response.status === 401 && !isRetry) {
-                console.log('🔄 Token expired, attempting refresh...');
+                if (__DEV__) console.log('🔄 Token expired, attempting refresh...');
 
                 // If a refresh is already in progress, wait for it
                 if (!this.refreshPromise) {
@@ -68,11 +102,11 @@ class CourierAPI {
             try {
                 data = JSON.parse(text);
             } catch (e) {
-                console.error(`❌ Failed to parse response from ${endpoint}:`, text.substring(0, 100));
+                if (__DEV__) console.error(`❌ Failed to parse response from ${endpoint}:`, text.substring(0, 100));
                 if (response.status === 404) {
-                    throw new Error(`Endpoint not found (404) at ${endpoint}`);
+                    throw new Error(USER_FRIENDLY_ERRORS.not_found);
                 }
-                throw new Error(`Server returned invalid response format (${response.status})`);
+                throw new Error(USER_FRIENDLY_ERRORS.server_error);
             }
 
             if (!response.ok) {
@@ -81,19 +115,28 @@ class CourierAPI {
                     await this.logout();
                 }
 
-                let errorMessage = data.detail || data.error || '';
-                if (!errorMessage && typeof data === 'object') {
-                    errorMessage = Object.keys(data)
-                        .map(key => `${key}: ${Array.isArray(data[key]) ? data[key][0] : data[key]}`)
-                        .join('\n');
+                // Get user-friendly error message
+                let userMessage = getUserFriendlyError(null, response.status);
+
+                // Try to get a specific error message from the response
+                const serverMessage = data.detail || data.error || data.message;
+                if (serverMessage && serverMessage.length < 150) {
+                    userMessage = serverMessage;
                 }
-                throw new Error(errorMessage || `Request failed with status ${response.status}`);
+
+                if (__DEV__) console.error(`❌ API Error (${response.status}):`, data);
+                throw new Error(userMessage);
             }
 
             return data;
         } catch (error) {
-            console.error(`❌ API Error for ${endpoint}:`, error.message);
-            throw error;
+            if (__DEV__) console.error(`❌ API Error for ${endpoint}:`, error.message);
+
+            // Ensure we throw a user-friendly error
+            if (error.message && error.message.length < 150) {
+                throw error;
+            }
+            throw new Error(getUserFriendlyError(error, null));
         }
     }
 
@@ -112,17 +155,17 @@ class CourierAPI {
                 const data = await response.json();
                 if (data.access) {
                     await AsyncStorage.setItem('authToken', data.access);
-                    console.log('✅ Token refreshed successfully');
+                    if (__DEV__) console.log('✅ Token refreshed successfully');
                     return true;
                 }
             }
 
             // If refresh fails, logout
-            console.warn('❌ Token refresh failed');
+            if (__DEV__) console.warn('❌ Token refresh failed');
             await this.logout();
             return false;
         } catch (error) {
-            console.error('Error refreshing token:', error);
+            if (__DEV__) console.error('Error refreshing token:', error);
             return false;
         }
     }
