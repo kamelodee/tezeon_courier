@@ -19,6 +19,7 @@ import { COLORS } from '../theme/colors';
 import courierApi from '../services/courierApi';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import backgroundService from '../services/backgroundService';
 
 // Daily goal defaults
 const DEFAULT_DAILY_GOAL = 5;
@@ -79,11 +80,16 @@ const DashboardScreen = ({ navigation }) => {
 
     // Effect to handle background tracking when online status changes
     useEffect(() => {
-        if (!loading && isOnline) {
-            startBackgroundTracking();
-        } else if (!loading && !isOnline) {
-            stopBackgroundTracking();
-        }
+        const syncBackgroundUpdates = async () => {
+            if (!loading) {
+                if (isOnline) {
+                    await backgroundService.startBackgroundUpdates();
+                } else {
+                    await backgroundService.stopBackgroundUpdates();
+                }
+            }
+        };
+        syncBackgroundUpdates();
     }, [isOnline, loading]);
 
     const updateCurrentLocation = async () => {
@@ -288,62 +294,55 @@ const DashboardScreen = ({ navigation }) => {
         loadData();
     }, []);
 
-    const startBackgroundTracking = async () => {
-        try {
-            // Respect user settings
-            const enabled = await AsyncStorage.getItem('backgroundLocationEnabled');
-            if (enabled === 'false') {
-                console.log('Background location disabled by user setting');
-                return;
-            }
-
-            const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
-            if (foregroundStatus !== 'granted') return;
-
-            const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
-            if (backgroundStatus !== 'granted') return;
-
-            const hasStarted = await Location.hasStartedLocationUpdatesAsync('location-tracking');
-            if (!hasStarted) {
-                await Location.startLocationUpdatesAsync('location-tracking', {
-                    accuracy: Location.Accuracy.Balanced,
-                    timeInterval: 60000, // 1 min updates for better tracking
-                    distanceInterval: 100,
-                    foregroundService: {
-                        notificationTitle: "Vizcome Online",
-                        notificationBody: "Reporting location for active deliveries",
-                        notificationColor: COLORS.primary
-                    }
-                });
-            }
-        } catch (error) {
-            console.error('Error starting tracking:', error);
-        }
-    };
-
-    const stopBackgroundTracking = async () => {
-        try {
-            const hasStarted = await Location.hasStartedLocationUpdatesAsync('location-tracking');
-            if (hasStarted) {
-                await Location.stopLocationUpdatesAsync('location-tracking');
-            }
-        } catch (error) {
-            console.error('Error stopping tracking:', error);
-        }
-    };
+    // Unified background tracking is now handled by the centralized backgroundService
 
     const toggleOnlineStatus = async () => {
+        // Verification Check
+        if (!isOnline && !profile?.is_verified) {
+            Alert.alert(
+                'Verification Required',
+                'You must upload your documents and be verified to go online.',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Go to Verification', onPress: () => navigation.navigate('Verification', { profile }) }
+                ]
+            );
+            return;
+        }
+
         setTogglingStatus(true);
         try {
-            const response = isOnline
-                ? await courierApi.goOffline()
-                : await courierApi.goOnline();
+            if (!isOnline) {
+                // Going Online
+                const bgResponse = await backgroundService.startBackgroundUpdates();
+                if (!bgResponse.success) {
+                    Alert.alert('Permission Required', bgResponse.error);
+                    setTogglingStatus(false);
+                    return;
+                }
 
-            if (response.success) {
-                setIsOnline(!isOnline);
+                const response = await courierApi.goOnline();
+                if (response.success) {
+                    setIsOnline(true);
+                } else {
+                    await backgroundService.stopBackgroundUpdates();
+                    Alert.alert('Error', response.error || 'Failed to go online');
+                }
+            } else {
+                // Going Offline
+                await backgroundService.stopBackgroundUpdates();
+                const response = await courierApi.goOffline();
+                if (response.success) {
+                    setIsOnline(false);
+                } else {
+                    // Even if API fails, we keep the UI offline for local state consistency
+                    setIsOnline(false);
+                    Alert.alert('Offline', 'You are now offline (server update delayed)');
+                }
             }
         } catch (error) {
-            Alert.alert('Error', 'Failed to update status');
+            console.error('Toggle status error:', error);
+            Alert.alert('Error', 'An unexpected error occurred');
         } finally {
             setTogglingStatus(false);
         }
@@ -530,6 +529,70 @@ const DashboardScreen = ({ navigation }) => {
                         style={{ width: isTablet ? (width - 60) / 4 : (width - 40) / 2 }}
                     />
                 </View>
+
+                {/* Wallet Balance Card */}
+                <TouchableOpacity
+                    style={styles.walletCard}
+                    onPress={() => navigation.navigate('Earnings')}
+                >
+                    <View style={styles.walletHeader}>
+                        <View style={styles.walletIconContainer}>
+                            <Ionicons name="wallet" size={28} color={COLORS.white} />
+                        </View>
+                        <View style={styles.walletInfo}>
+                            <Text style={styles.walletLabel}>Wallet Balance</Text>
+                            <Text style={styles.walletAmount}>
+                                ₵{parseFloat(profile?.wallet_balance || 0).toFixed(2)}
+                            </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={22} color="rgba(255,255,255,0.7)" />
+                    </View>
+
+                    {/* Cash Collection Warning */}
+                    {parseFloat(profile?.cash_collected || 0) > 0 && (
+                        <View style={styles.cashWarning}>
+                            <Ionicons name="alert-circle" size={18} color="#DC2626" />
+                            <Text style={styles.cashWarningText}>
+                                ₵{parseFloat(profile?.cash_collected).toFixed(2)} cash to remit
+                            </Text>
+                        </View>
+                    )}
+
+                    <View style={styles.walletStats}>
+                        <View style={styles.walletStatItem}>
+                            <Text style={styles.walletStatLabel}>Total Earned</Text>
+                            <Text style={styles.walletStatValue}>
+                                ₵{parseFloat(dashboard?.total_earnings || 0).toFixed(2)}
+                            </Text>
+                        </View>
+                        <View style={styles.walletStatDivider} />
+                        <View style={styles.walletStatItem}>
+                            <Text style={styles.walletStatLabel}>This Week</Text>
+                            <Text style={styles.walletStatValue}>
+                                ₵{parseFloat(dashboard?.week_earnings || 0).toFixed(2)}
+                            </Text>
+                        </View>
+                    </View>
+                </TouchableOpacity>
+
+                {/* Route Planning Quick Access */}
+                {activeDeliveries.length > 0 && (
+                    <TouchableOpacity
+                        style={styles.routePlanningCard}
+                        onPress={() => navigation.navigate('RoutePlanning')}
+                    >
+                        <View style={styles.routePlanningContent}>
+                            <View style={styles.routePlanningIconContainer}>
+                                <Ionicons name="map" size={24} color={COLORS.white} />
+                            </View>
+                            <View style={styles.routePlanningTextContainer}>
+                                <Text style={styles.routePlanningTitle}>Optimize Route</Text>
+                                <Text style={styles.routePlanningSubtitle}>View all {activeDeliveries.length} stops on map</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color={COLORS.primary} />
+                        </View>
+                    </TouchableOpacity>
+                )}
 
                 {/* Active Deliveries */}
                 <View style={[styles.section, isTablet && styles.sectionTablet]}>
@@ -1059,6 +1122,126 @@ const styles = StyleSheet.create({
     successRate: { alignItems: 'flex-end' },
     successLabel: { fontSize: 12, color: COLORS.white, opacity: 0.8 },
     successValue: { fontSize: 24, fontWeight: 'bold', color: COLORS.white },
+
+    // Wallet Card Styles
+    walletCard: {
+        backgroundColor: '#10B981',
+        borderRadius: 20,
+        padding: 20,
+        marginHorizontal: 16,
+        marginBottom: 16,
+        elevation: 6,
+        shadowColor: '#10B981',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+    },
+    walletHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    walletIconContainer: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    walletInfo: {
+        flex: 1,
+        marginLeft: 14,
+    },
+    walletLabel: {
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.8)',
+        fontWeight: '500',
+    },
+    walletAmount: {
+        fontSize: 28,
+        fontWeight: 'bold',
+        color: COLORS.white,
+    },
+    cashWarning: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FEE2E2',
+        padding: 10,
+        borderRadius: 10,
+        marginTop: 14,
+        gap: 8,
+    },
+    cashWarningText: {
+        fontSize: 13,
+        color: '#DC2626',
+        fontWeight: '600',
+    },
+    walletStats: {
+        flexDirection: 'row',
+        marginTop: 16,
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.2)',
+    },
+    walletStatItem: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    walletStatDivider: {
+        width: 1,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+    },
+    walletStatLabel: {
+        fontSize: 11,
+        color: 'rgba(255,255,255,0.7)',
+        fontWeight: '500',
+    },
+    walletStatValue: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: COLORS.white,
+        marginTop: 4,
+    },
+    routePlanningCard: {
+        backgroundColor: COLORS.white,
+        borderRadius: 16,
+        padding: 16,
+        marginHorizontal: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
+    routePlanningContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    routePlanningIconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: COLORS.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    routePlanningTextContainer: {
+        flex: 1,
+        marginLeft: 14,
+    },
+    routePlanningTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: COLORS.text,
+    },
+    routePlanningSubtitle: {
+        fontSize: 12,
+        color: COLORS.muted,
+        marginTop: 2,
+    },
 });
 
 export default DashboardScreen;

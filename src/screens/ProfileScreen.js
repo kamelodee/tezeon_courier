@@ -199,7 +199,7 @@ const ProfileScreen = ({ navigation }) => {
                             icon="star-outline"
                             title="My Ratings"
                             subtitle={`${profile?.total_ratings || 0} reviews`}
-                            onPress={() => { }}
+                            onPress={() => navigation.navigate('Ratings')}
                             color={COLORS.warning}
                         />
                         <MenuItem
@@ -216,7 +216,7 @@ const ProfileScreen = ({ navigation }) => {
                         <MenuItem
                             icon="notifications-outline"
                             title="Notifications"
-                            onPress={() => { }}
+                            onPress={() => navigation.navigate('NotificationSettings')}
                         />
                         <MenuItem
                             icon="location-outline"
@@ -226,12 +226,12 @@ const ProfileScreen = ({ navigation }) => {
                         <MenuItem
                             icon="help-circle-outline"
                             title="Help & Support"
-                            onPress={() => { }}
+                            onPress={() => navigation.navigate('HelpSupport')}
                         />
                         <MenuItem
                             icon="document-text-outline"
                             title="Terms & Conditions"
-                            onPress={() => { }}
+                            onPress={() => navigation.navigate('Terms')}
                         />
                     </View>
                 </View>

@@ -287,6 +287,30 @@ class CourierAPI {
         return { success: false, error: lastError?.message || 'Login failed' };
     }
 
+    async requestPasswordReset(email) {
+        try {
+            const data = await this.request('/auth/password/reset/otp/request/', {
+                method: 'POST',
+                body: JSON.stringify({ email })
+            });
+            return { success: true, data };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    async confirmPasswordResetOTP(email, otp_code, new_password) {
+        try {
+            const data = await this.request('/auth/password/reset/otp/verify/', {
+                method: 'POST',
+                body: JSON.stringify({ email, otp_code, new_password })
+            });
+            return { success: true, data };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
     async logout() {
         await AsyncStorage.removeItem('authToken');
         await AsyncStorage.removeItem('refreshToken');
@@ -380,6 +404,15 @@ class CourierAPI {
             return { success: true };
         } catch (error) {
             return { success: false };
+        }
+    }
+
+    async subscribe() {
+        try {
+            const data = await this.request(`${COURIER_URL}/profile/subscribe/`, { method: 'POST' });
+            return { success: true, data };
+        } catch (error) {
+            return { success: false, error: error.message };
         }
     }
 
@@ -538,6 +571,30 @@ class CourierAPI {
             return { success: true, data: data.results || data };
         } catch (error) {
             return { success: false, data: [] };
+        }
+    }
+
+    async requestPayout(data) {
+        try {
+            const result = await this.request(`${COURIER_URL}/earnings/payout/`, {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+            return { success: true, data: result };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    async reportIssue(data) {
+        try {
+            const result = await this.request(`${COURIER_URL}/support/report/`, {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+            return { success: true, data: result };
+        } catch (error) {
+            return { success: false, error: error.message };
         }
     }
 }

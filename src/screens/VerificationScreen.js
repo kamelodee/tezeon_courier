@@ -26,14 +26,25 @@ const VerificationScreen = ({ navigation, route }) => {
     // Form fields
     const [ghanaCardNumber, setGhanaCardNumber] = useState(profile?.ghana_card_number || '');
     const [ghanaCardPhoto, setGhanaCardPhoto] = useState(profile?.ghana_card_photo || null);
+    const [ghanaCardBackPhoto, setGhanaCardBackPhoto] = useState(profile?.id_card_photo || null); // Back of ID
+
     const [licenseNumber, setLicenseNumber] = useState(profile?.license_number || '');
     const [licensePhoto, setLicensePhoto] = useState(profile?.driving_license_photo || null);
+    const [licenseBackPhoto, setLicenseBackPhoto] = useState(profile?.driving_license_back_photo || null); // Back of License
 
     useEffect(() => {
         if (!profile) {
             loadProfile();
+        } else {
+            // Ensure local state syncs with passed profile if needed
+            setGhanaCardNumber(profile.ghana_card_number || '');
+            setGhanaCardPhoto(profile.ghana_card_photo || null);
+            setGhanaCardBackPhoto(profile.id_card_photo || null);
+            setLicenseNumber(profile.license_number || '');
+            setLicensePhoto(profile.driving_license_photo || null);
+            setLicenseBackPhoto(profile.driving_license_back_photo || null);
         }
-    }, []);
+    }, [profile]);
 
     const loadProfile = async () => {
         setLoading(true);
@@ -41,10 +52,7 @@ const VerificationScreen = ({ navigation, route }) => {
             const response = await courierApi.getProfile();
             if (response.success) {
                 setProfile(response.data);
-                setGhanaCardNumber(response.data.ghana_card_number || '');
-                setGhanaCardPhoto(response.data.ghana_card_photo || null);
-                setLicenseNumber(response.data.license_number || '');
-                setLicensePhoto(response.data.driving_license_photo || null);
+                // State will update via effect
             }
         } catch (error) {
             console.error('Load profile error:', error);
@@ -61,7 +69,7 @@ const VerificationScreen = ({ navigation, route }) => {
         }
 
         let result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            mediaTypes: ['images'],
             allowsEditing: true,
             aspect: [4, 3],
             quality: 0.7,
@@ -78,31 +86,49 @@ const VerificationScreen = ({ navigation, route }) => {
             return;
         }
 
+        if (!ghanaCardPhoto) {
+            Alert.alert('Required', 'Please upload the front of your Ghana Card');
+            return;
+        }
+
+        if (!ghanaCardBackPhoto) {
+            Alert.alert('Required', 'Please upload the back of your Ghana Card');
+            return;
+        }
+
+        if (licenseNumber.trim() && (!licensePhoto || !licenseBackPhoto)) {
+            Alert.alert('Incomplete', 'If providing a driving license, please upload both front and back photos.');
+            return;
+        }
+
         setUploading(true);
         try {
             const formData = new FormData();
             formData.append('ghana_card_number', ghanaCardNumber);
             formData.append('license_number', licenseNumber);
 
-            if (ghanaCardPhoto && !ghanaCardPhoto.startsWith('http')) {
-                const filename = ghanaCardPhoto.split('/').pop();
-                const match = /\.(\w+)$/.exec(filename);
-                const type = match ? `image/${match[1]}` : `image`;
-                formData.append('ghana_card_photo', { uri: ghanaCardPhoto, name: filename, type });
-            }
+            // Helper to append image
+            const appendImage = (key, uri) => {
+                if (uri && !uri.startsWith('http')) {
+                    const filename = uri.split('/').pop();
+                    const match = /\.(\w+)$/.exec(filename);
+                    const type = match ? `image/${match[1]}` : `image/jpeg`;
+                    formData.append(key, { uri: uri, name: filename, type });
+                }
+            };
 
-            if (licensePhoto && !licensePhoto.startsWith('http')) {
-                const filename = licensePhoto.split('/').pop();
-                const match = /\.(\w+)$/.exec(filename);
-                const type = match ? `image/${match[1]}` : `image`;
-                formData.append('driving_license_photo', { uri: licensePhoto, name: filename, type });
-            }
+            appendImage('ghana_card_photo', ghanaCardPhoto);
+            appendImage('id_card_photo', ghanaCardBackPhoto); // Backend field for ID Back
+            appendImage('driving_license_photo', licensePhoto);
+            appendImage('driving_license_back_photo', licenseBackPhoto);
 
             const response = await courierApi.updateProfileWithDocuments(formData);
             if (response.success) {
-                Alert.alert('Success', 'Verification documents uploaded successfully. Our team will review them shortly.', [
-                    { text: 'OK', onPress: () => navigation.goBack() }
-                ]);
+                Alert.alert(
+                    'Success',
+                    'Verification documents uploaded successfully. Your account is pending admin approval.',
+                    [{ text: 'OK', onPress: () => navigation.goBack() }]
+                );
             } else {
                 Alert.alert('Error', response.error || 'Failed to upload documents');
             }
@@ -126,7 +152,7 @@ const VerificationScreen = ({ navigation, route }) => {
                 ) : (
                     <View style={styles.pickerPlaceholder}>
                         <Ionicons name={icon} size={32} color={COLORS.muted} />
-                        <Text style={styles.pickerText}>Click to upload photo</Text>
+                        <Text style={styles.pickerText}>Click to upload</Text>
                     </View>
                 )}
                 {value && (
@@ -166,10 +192,11 @@ const VerificationScreen = ({ navigation, route }) => {
                     <View style={styles.infoBox}>
                         <Ionicons name="shield-checkmark-outline" size={24} color={COLORS.primary} />
                         <Text style={styles.infoText}>
-                            To comply with local regulations and ensure community safety, we require verification of your identity and driving credentials.
+                            To go online, please upload clear photos of your ID and License.
                         </Text>
                     </View>
 
+                    {/* Ghana Card Section */}
                     <View style={[styles.section, { borderTopWidth: 0 }]}>
                         <Text style={styles.sectionTitle}>GHANA CARD (REQUIRED)</Text>
                         <View style={styles.inputGroup}>
@@ -185,13 +212,25 @@ const VerificationScreen = ({ navigation, route }) => {
                                 />
                             </View>
                         </View>
-                        <DocumentPicker
-                            label="Front of Ghana Card"
-                            value={ghanaCardPhoto}
-                            setter={setGhanaCardPhoto}
-                        />
+                        <View style={styles.row}>
+                            <View style={styles.halfWidth}>
+                                <DocumentPicker
+                                    label="Front View"
+                                    value={ghanaCardPhoto}
+                                    setter={setGhanaCardPhoto}
+                                />
+                            </View>
+                            <View style={styles.halfWidth}>
+                                <DocumentPicker
+                                    label="Back View"
+                                    value={ghanaCardBackPhoto}
+                                    setter={setGhanaCardBackPhoto}
+                                />
+                            </View>
+                        </View>
                     </View>
 
+                    {/* Driving License Section */}
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>DRIVING LICENSE (IF APPLICABLE)</Text>
                         <View style={styles.inputGroup}>
@@ -207,11 +246,22 @@ const VerificationScreen = ({ navigation, route }) => {
                                 />
                             </View>
                         </View>
-                        <DocumentPicker
-                            label="License Photo"
-                            value={licensePhoto}
-                            setter={setLicensePhoto}
-                        />
+                        <View style={styles.row}>
+                            <View style={styles.halfWidth}>
+                                <DocumentPicker
+                                    label="Front View"
+                                    value={licensePhoto}
+                                    setter={setLicensePhoto}
+                                />
+                            </View>
+                            <View style={styles.halfWidth}>
+                                <DocumentPicker
+                                    label="Back View"
+                                    value={licenseBackPhoto}
+                                    setter={setLicenseBackPhoto}
+                                />
+                            </View>
+                        </View>
                     </View>
 
                     <View style={styles.footer}>
@@ -276,30 +326,41 @@ const styles = StyleSheet.create({
     },
     inputIcon: { marginRight: 12 },
     input: { flex: 1, paddingVertical: 14, fontSize: 15, color: COLORS.text },
+
+    // Grid layout for photos
+    row: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: 12
+    },
+    halfWidth: {
+        flex: 1
+    },
+
     pickerContainer: { marginBottom: 12 },
-    pickerLabel: { fontSize: 14, fontWeight: '600', color: COLORS.text, marginBottom: 8 },
+    pickerLabel: { fontSize: 13, fontWeight: '600', color: COLORS.text, marginBottom: 8 },
     imagePicker: {
         width: '100%',
-        height: 180,
+        height: 120, // Slightly smaller since we have two side-by-side
         backgroundColor: COLORS.background,
-        borderRadius: 16,
+        borderRadius: 12,
         borderWidth: 2,
         borderColor: COLORS.border,
         borderStyle: 'dashed',
         overflow: 'hidden',
     },
     imagePickerActive: { borderStyle: 'solid', borderColor: COLORS.primary },
-    pickerPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8 },
-    pickerText: { fontSize: 14, color: COLORS.muted },
-    previewImage: { width: '100%', height: '100%' },
+    pickerPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 4 },
+    pickerText: { fontSize: 12, color: COLORS.muted },
+    previewImage: { width: '100%', height: '100%', resizeMode: 'cover' },
     editOverlay: {
         position: 'absolute',
-        right: 12,
-        bottom: 12,
+        right: 8,
+        bottom: 8,
         backgroundColor: 'rgba(0,0,0,0.6)',
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
         justifyContent: 'center',
         alignItems: 'center',
     },

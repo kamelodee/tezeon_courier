@@ -55,15 +55,41 @@ const RegisterScreen = ({ navigation }) => {
 
             const response = await courierApi.register(data);
             if (response.success) {
-                Alert.alert(
-                    'Success',
-                    'Registration successful! Please sign in to access your dashboard.',
-                    [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
-                );
+                // Auto-login and redirect to complete setup
+                const loginResponse = await courierApi.login(email, password);
+                if (loginResponse.success) {
+                    // Get profile and redirect to complete document upload
+                    const profileRes = await courierApi.getProfile();
+                    Alert.alert(
+                        '🎉 Account Created!',
+                        'Now let\'s complete your profile with documents to get verified.',
+                        [{
+                            text: 'Continue',
+                            onPress: () => {
+                                navigation.reset({
+                                    index: 0,
+                                    routes: [{
+                                        name: 'VehicleSetup',
+                                        params: {
+                                            isFirstSetup: true,
+                                            profile: profileRes.data || {}
+                                        }
+                                    }]
+                                });
+                            }
+                        }]
+                    );
+                } else {
+                    // Login failed, redirect to login screen
+                    Alert.alert(
+                        'Success',
+                        'Registration successful! Please sign in.',
+                        [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+                    );
+                }
             } else {
-                // Handle 500 errors or other server failures gracefully
                 const errorMsg = response.error?.includes('invalid response format')
-                    ? 'The server encountered an error. We are trying to fix it. Please try again later.'
+                    ? 'The server encountered an error. Please try again later.'
                     : response.error;
                 Alert.alert('Registration Failed', errorMsg || 'Please try again');
             }

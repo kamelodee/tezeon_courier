@@ -1,12 +1,13 @@
 {
   "expo": {
-    "name": "TCS",
-    "slug": "tcs-courier",
+    "name": "Tezeon Driver",
+    "slug": "tezeon-driver",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "scheme": "tezeon-driver",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -14,11 +15,15 @@
     },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.tezeon.driver",
       "infoPlist": {
         "UIBackgroundModes": [
           "location",
           "fetch"
-        ]
+        ],
+        "NSLocationWhenInUseUsageDescription": "Tezeon Courier needs your location to show you nearby delivery jobs and provide navigation to pickup and delivery points.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Tezeon Courier needs background location access to keep customers updated on their delivery status and ensure you receive nearby job notifications even when the app is in the background.",
+        "NSLocationAlwaysUsageDescription": "Background location is needed to track deliveries and update customers in real-time."
       }
     },
     "android": {
@@ -27,7 +32,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.tcs.courier",
+      "package": "com.tezeon.driver",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -40,8 +45,21 @@
     },
     "extra": {
       "eas": {
-        "projectId": "c4aabb34-12b9-45f5-99d8-0fa0763acab8"
+        "projectId": "25822230-72fb-4dc2-8160-0f88581750ff"
       }
-    }
+    },
+    "owner": "kamilo",
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Tezeon Driver to use your location even when you are not using the app to track deliveries and receive nearby jobs.",
+          "locationAlwaysPermission": "Allow Tezeon Driver to use your location in the background.",
+          "locationWhenInUsePermission": "Allow Tezeon Driver to use your location while using the app.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ]
+    ]
   }
 }

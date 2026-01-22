@@ -33,13 +33,34 @@ const LoginScreen = ({ navigation }) => {
         try {
             const response = await courierApi.login(email, password);
             if (response.success) {
-                // Check if user has courier profile
+                // Check if user has courier profile and if it's complete
                 const profile = await courierApi.getProfile();
                 if (profile.success) {
-                    navigation.reset({
-                        index: 0,
-                        routes: [{ name: 'MainTabs' }]
-                    });
+                    const profileData = profile.data;
+
+                    // Check if profile needs setup (no vehicle or no documents)
+                    const needsVehicleSetup = !profileData.vehicle_type;
+                    const needsDocuments = !profileData.ghana_card_number || !profileData.ghana_card_photo;
+
+                    if (needsVehicleSetup || needsDocuments) {
+                        // Redirect to vehicle/document setup
+                        navigation.reset({
+                            index: 0,
+                            routes: [{
+                                name: 'VehicleSetup',
+                                params: {
+                                    isFirstSetup: true,
+                                    profile: profileData
+                                }
+                            }]
+                        });
+                    } else {
+                        // Profile is complete, go to main app
+                        navigation.reset({
+                            index: 0,
+                            routes: [{ name: 'MainTabs' }]
+                        });
+                    }
                 } else {
                     Alert.alert('Access Denied', 'You are not registered as a courier');
                     await courierApi.logout();
@@ -123,7 +144,10 @@ const LoginScreen = ({ navigation }) => {
                             )}
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.forgotButton}>
+                        <TouchableOpacity
+                            style={styles.forgotButton}
+                            onPress={() => navigation.navigate('ForgotPassword')}
+                        >
                             <Text style={styles.forgotText}>Forgot Password?</Text>
                         </TouchableOpacity>
                     </View>

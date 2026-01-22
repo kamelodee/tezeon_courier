@@ -139,7 +139,23 @@ const DeliveriesScreen = ({ navigation, route }) => {
                         setDeliveries(prev => [...prev, ...data]);
                     }
                 } else {
-                    setDeliveries(data);
+                    // Check logic for premium availability access
+                    if (filter === 'available' && !response.is_premium && response.is_freelance) {
+                        setDeliveries([]);
+                        Alert.alert(
+                            'Unlock Earning',
+                            'To accept jobs on the Delivery Marketplace, you need to upgrade to Premium.',
+                            [
+                                { text: 'Later', style: 'cancel' },
+                                {
+                                    text: 'Upgrade Now',
+                                    onPress: () => navigation.navigate('Earnings')
+                                }
+                            ]
+                        );
+                    } else {
+                        setDeliveries(data);
+                    }
                 }
             } else if (filter === 'available' && response.error?.includes('must be online')) {
                 setDeliveries([]);
@@ -172,6 +188,7 @@ const DeliveriesScreen = ({ navigation, route }) => {
             setLoadingMore(false);
         }
     };
+
 
     const loadMoreHistory = () => {
         if (filter !== 'history' || loadingMore || deliveries.length >= historyTotal) return;

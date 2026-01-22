@@ -226,6 +226,20 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
         }
     };
 
+    const chatWithCustomer = () => {
+        if (delivery?.delivery_contact_phone) {
+            const phone = delivery.delivery_contact_phone.replace(/\+/g, '');
+            const url = `whatsapp://send?phone=${phone}`;
+            Linking.canOpenURL(url).then(supported => {
+                if (supported) {
+                    Linking.openURL(url);
+                } else {
+                    Alert.alert('Error', 'WhatsApp is not installed');
+                }
+            });
+        }
+    };
+
     const callCustomer = () => {
         if (delivery?.delivery_contact_phone) {
             Linking.openURL(`tel:${delivery.delivery_contact_phone}`);
@@ -440,6 +454,16 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                             </View>
                             <Ionicons name="chevron-forward" size={20} color={COLORS.muted} />
                         </TouchableOpacity>
+                        <TouchableOpacity style={styles.infoRow} onPress={chatWithCustomer}>
+                            <Ionicons name="logo-whatsapp" size={20} color={COLORS.success} />
+                            <View style={styles.infoContent}>
+                                <Text style={styles.infoLabel}>Chat (WhatsApp)</Text>
+                                <Text style={[styles.infoValue, { color: COLORS.primary }]}>
+                                    {delivery?.delivery_contact_phone}
+                                </Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color={COLORS.muted} />
+                        </TouchableOpacity>
                     </View>
                 </View>
 
@@ -556,10 +580,13 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                     {delivery?.status !== 'pending' && (
                         <TouchableOpacity
                             style={styles.failButton}
-                            onPress={() => setShowFailModal(true)}
+                            onPress={() => navigation.navigate('SupportTicket', {
+                                deliveryId: delivery.id,
+                                reason: 'vehicle_breakdown' // Default or based on context
+                            })}
                         >
-                            <Ionicons name="close-circle" size={20} color={COLORS.error} />
-                            <Text style={styles.failButtonText}>Can't Deliver</Text>
+                            <Ionicons name="alert-circle" size={20} color={COLORS.error} />
+                            <Text style={styles.failButtonText}>Issues</Text>
                         </TouchableOpacity>
                     )}
                     <TouchableOpacity

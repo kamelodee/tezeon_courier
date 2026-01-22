@@ -5,22 +5,62 @@ import {
     StyleSheet,
     FlatList,
     RefreshControl,
-    ActivityIndicator
+    ActivityIndicator,
+    Alert,
+    TouchableOpacity
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../theme/colors';
 import courierApi from '../services/courierApi';
 
-const EarningsScreen = () => {
+const EarningsScreen = ({ navigation }) => {
     const [summary, setSummary] = useState(null);
     const [earnings, setEarnings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
+    const mockChartData = [
+        { label: 'M', value: 45 },
+        { label: 'T', value: 78 },
+        { label: 'W', value: 52 },
+        { label: 'T', value: 95 },
+        { label: 'F', value: 120 },
+        { label: 'S', value: 156 },
+        { label: 'S', value: 88 },
+    ];
+
     useEffect(() => {
         loadData();
     }, []);
+
+    const PerformanceChart = ({ data }) => {
+        const maxValue = Math.max(...data.map(d => d.value), 10);
+
+        return (
+            <View style={styles.chartCard}>
+                <View style={styles.chartHeader}>
+                    <Text style={styles.chartTitle}>Weekly Performance</Text>
+                    <Ionicons name="trending-up" size={16} color={COLORS.success} />
+                </View>
+                <View style={styles.chartContent}>
+                    {data.map((day, index) => (
+                        <View key={index} style={styles.chartBarContainer}>
+                            <View style={styles.barBackground}>
+                                <View
+                                    style={[
+                                        styles.barActive,
+                                        { height: `${(day.value / maxValue) * 100}%` }
+                                    ]}
+                                />
+                            </View>
+                            <Text style={styles.barLabel}>{day.label}</Text>
+                        </View>
+                    ))}
+                </View>
+            </View>
+        );
+    };
 
     const loadData = async () => {
         try {
@@ -47,6 +87,35 @@ const EarningsScreen = () => {
         setRefreshing(true);
         loadData();
     }, []);
+
+    const handleSubscribe = () => {
+        Alert.alert(
+            'Confirm Subscription',
+            'Upgrade to Premium for ₵50/month to access Marketplace jobs? This amount will be deducted from your earnings or billed.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Confirm',
+                    onPress: async () => {
+                        setLoading(true);
+                        try {
+                            const response = await courierApi.subscribe();
+                            if (response.success) {
+                                Alert.alert('Success', 'Welcome to Premium! You can now access marketplace jobs.');
+                                loadData(); // Refresh to see active status
+                            } else {
+                                Alert.alert('Error', response.error || 'Failed to subscribe');
+                            }
+                        } catch (error) {
+                            Alert.alert('Error', 'An unexpected error occurred');
+                        } finally {
+                            setLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
 
     const getTypeIcon = (type) => {
         const icons = {
@@ -112,7 +181,13 @@ const EarningsScreen = () => {
         <SafeAreaView style={styles.container} edges={['top']}>
             {/* Header */}
             <View style={styles.header}>
-                <Text style={styles.headerTitle}>Earnings</Text>
+                <View>
+                    <Text style={styles.headerTitle}>Earnings</Text>
+                    <Text style={styles.headerSubtitle}>Track your revenue</Text>
+                </View>
+                <View style={styles.headerIcon}>
+                    <Ionicons name="wallet" size={24} color={COLORS.primary} />
+                </View>
             </View>
 
             <FlatList
@@ -132,6 +207,13 @@ const EarningsScreen = () => {
                                 <Text style={styles.summaryAmount}>
                                     ₵{parseFloat(summary?.total || 0).toFixed(2)}
                                 </Text>
+                                <TouchableOpacity
+                                    style={styles.cashOutButton}
+                                    onPress={() => navigation.navigate('Payout', { balance: summary?.total || 0 })}
+                                >
+                                    <Text style={styles.cashOutButtonText}>Cash Out Now</Text>
+                                    <Ionicons name="arrow-forward" size={16} color={COLORS.primary} />
+                                </TouchableOpacity>
                             </View>
                             <View style={styles.summaryGrid}>
                                 <View style={styles.summaryItem}>
@@ -148,10 +230,65 @@ const EarningsScreen = () => {
                                 </View>
                                 <View style={styles.summaryItem}>
                                     <Text style={styles.itemLabel}>Pending Payout</Text>
-                                    <Text style={[styles.itemValue, { color: COLORS.warning }]}>
+                                    <Text style={[styles.itemValue, { color: '#FFD700' }]}>
                                         ₵{parseFloat(summary?.pending_payout || 0).toFixed(2)}
                                     </Text>
                                 </View>
+                            </View>
+                        </View>
+
+                        {/* Performance Chart */}
+                        <PerformanceChart data={mockChartData} />
+
+                        {/* Cash Collection / Debt Card */}
+                        {parseFloat(summary?.cash_collected || 0) > 0 && (
+                            <View style={styles.debtCard}>
+                                <View style={styles.debtHeader}>
+                                    <View>
+                                        <Text style={styles.debtLabel}>Cash Collected (To Remit)</Text>
+                                        <Text style={styles.debtAmount}>-₵{parseFloat(summary?.cash_collected).toFixed(2)}</Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        style={styles.remitButton}
+                                        onPress={() => Alert.alert('Remit Cash', 'Mobile Money payment integration coming soon.')}
+                                    >
+                                        <Text style={styles.remitText}>Remit Now</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <Text style={styles.debtNote}>
+                                    You have collected ₵{parseFloat(summary?.cash_collected).toFixed(2)} in cash.
+                                    Please remit this to the platform to avoid being blocked from new jobs.
+                                </Text>
+                            </View>
+                        )}
+
+                        {/* Subscription Card */}
+                        <View style={styles.subscriptionCard}>
+                            <View style={styles.subHeader}>
+                                <View style={styles.subTitleRow}>
+                                    <Ionicons name="diamond" size={24} color={summary?.is_premium ? COLORS.white : '#FFD700'} />
+                                    <View>
+                                        <Text style={styles.subTitle}>Premium Access</Text>
+                                        <Text style={styles.subStatus}>
+                                            {summary?.is_premium
+                                                ? `Active until ${new Date(summary.subscription_expiry).toLocaleDateString()}`
+                                                : 'Unlock Marketplace Jobs'}
+                                        </Text>
+                                    </View>
+                                </View>
+                                {summary?.is_premium ? (
+                                    <View style={styles.activeBadge}>
+                                        <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
+                                        <Text style={styles.activeText}>Active</Text>
+                                    </View>
+                                ) : (
+                                    <TouchableOpacity
+                                        style={styles.upgradeButton}
+                                        onPress={handleSubscribe}
+                                    >
+                                        <Text style={styles.upgradeText}>Upgrade - ₵50/mo</Text>
+                                    </TouchableOpacity>
+                                )}
                             </View>
                         </View>
 
@@ -175,22 +312,55 @@ const styles = StyleSheet.create({
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
     header: {
-        backgroundColor: COLORS.primary,
-        padding: 20,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 15,
+        backgroundColor: COLORS.white,
     },
-    headerTitle: { fontSize: 22, fontWeight: 'bold', color: COLORS.white },
+    headerTitle: { fontSize: 24, fontWeight: 'bold', color: COLORS.text },
+    headerSubtitle: { fontSize: 13, color: COLORS.muted, marginTop: 2 },
+    headerIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: `${COLORS.primary}10`,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
 
     listContent: { padding: 16 },
 
     summaryCard: {
         backgroundColor: COLORS.primary,
-        borderRadius: 16,
-        padding: 20,
+        borderRadius: 24,
+        padding: 24,
         marginBottom: 20,
+        elevation: 8,
+        shadowColor: COLORS.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
     },
-    summaryMain: { alignItems: 'center', marginBottom: 20 },
-    summaryLabel: { fontSize: 14, color: COLORS.white, opacity: 0.8 },
-    summaryAmount: { fontSize: 36, fontWeight: 'bold', color: COLORS.white, marginTop: 8 },
+    summaryMain: { alignItems: 'center', marginBottom: 24 },
+    summaryLabel: { fontSize: 13, color: COLORS.white, opacity: 0.8, textTransform: 'uppercase', letterSpacing: 1 },
+    summaryAmount: { fontSize: 40, fontWeight: 'bold', color: COLORS.white, marginTop: 8 },
+    cashOutButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.white,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        marginTop: 16,
+        gap: 8,
+    },
+    cashOutButtonText: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: COLORS.primary,
+    },
     summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     summaryItem: {
         flex: 1,
@@ -222,9 +392,165 @@ const styles = StyleSheet.create({
     paidBadge: { backgroundColor: `${COLORS.success}20`, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, marginTop: 4 },
     paidText: { fontSize: 10, fontWeight: '600', color: COLORS.success },
 
-    emptyState: { alignItems: 'center', padding: 40 },
-    emptyTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.text, marginTop: 16 },
     emptyText: { fontSize: 14, color: COLORS.muted, marginTop: 8 },
+
+    // Chart Styles
+    chartCard: {
+        backgroundColor: COLORS.white,
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 20,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 5,
+    },
+    chartHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    chartTitle: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: COLORS.text,
+    },
+    chartContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-end',
+        height: 120,
+        paddingHorizontal: 10,
+    },
+    chartBarContainer: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    barBackground: {
+        width: 16,
+        height: 100,
+        backgroundColor: `${COLORS.primary}10`,
+        borderRadius: 6,
+        justifyContent: 'flex-end',
+        overflow: 'hidden',
+    },
+    barActive: {
+        width: '100%',
+        backgroundColor: COLORS.primary,
+        borderRadius: 6,
+    },
+    barLabel: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: COLORS.muted,
+        marginTop: 8,
+    },
+
+    // Subscription Styles
+    subscriptionCard: {
+        backgroundColor: '#2D3436',
+        borderRadius: 20,
+        padding: 24,
+        marginBottom: 24,
+        elevation: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 215, 0, 0.3)', // Subtle gold border
+    },
+    subHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    subTitleRow: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginRight: 8,
+    },
+    subTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: COLORS.white,
+    },
+    subStatus: {
+        fontSize: 12,
+        color: '#A0A0B0',
+        marginTop: 2,
+    },
+    activeBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(76, 175, 80, 0.2)',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+        gap: 4,
+    },
+    activeText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: '#4CAF50',
+    },
+    upgradeButton: {
+        backgroundColor: '#FFD700',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+    },
+    upgradeText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: '#000',
+    },
+
+    // Debt / Cash Styles
+    debtCard: {
+        backgroundColor: '#FFE5E5',
+        borderRadius: 16,
+        padding: 20,
+        marginBottom: 20,
+        borderLeftWidth: 4,
+        borderLeftColor: COLORS.error,
+    },
+    debtHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    debtLabel: {
+        fontSize: 12,
+        color: COLORS.error,
+        fontWeight: '600',
+    },
+    debtAmount: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: COLORS.error,
+    },
+    debtNote: {
+        fontSize: 12,
+        color: '#666',
+        lineHeight: 18,
+    },
+    remitButton: {
+        backgroundColor: COLORS.error,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+    },
+    remitText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: COLORS.white,
+    },
 });
 
 export default EarningsScreen;

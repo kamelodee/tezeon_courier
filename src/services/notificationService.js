@@ -8,6 +8,7 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import courierApi from './courierApi';
+import Constants from 'expo-constants';
 
 // Configure how notifications appear when app is in foreground
 Notifications.setNotificationHandler({
@@ -58,10 +59,10 @@ class NotificationService {
      */
     cleanup() {
         if (this.notificationListener) {
-            Notifications.removeNotificationSubscription(this.notificationListener);
+            this.notificationListener.remove();
         }
         if (this.responseListener) {
-            Notifications.removeNotificationSubscription(this.responseListener);
+            this.responseListener.remove();
         }
     }
 
@@ -132,8 +133,9 @@ class NotificationService {
 
         // Get Expo push token
         try {
+            const projectId = Constants.expoConfig.extra.eas.projectId || Constants.manifest?.extra?.eas?.projectId;
             token = (await Notifications.getExpoPushTokenAsync({
-                projectId: 'your-expo-project-id' // Replace with actual project ID
+                projectId: projectId
             })).data;
             console.log('Expo Push Token:', token);
         } catch (error) {
