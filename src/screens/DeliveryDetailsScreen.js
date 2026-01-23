@@ -13,7 +13,7 @@ import {
     Image,
     Platform
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../theme/colors';
 import { hp } from '../utils/responsive';
@@ -316,6 +316,7 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
     }
 
     const nextAction = getNextAction();
+    const insets = useSafeAreaInsets();
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
@@ -342,6 +343,30 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                         </View>
                     </View>
                 )}
+
+                {/* Scheduled Delivery Banner */}
+                {delivery?.is_scheduled && delivery?.scheduled_pickup_time && (
+                    <View style={styles.scheduledDeliveryBanner}>
+                        <View style={styles.scheduledIconContainer}>
+                            <Ionicons name="calendar" size={24} color={COLORS.white} />
+                        </View>
+                        <View style={styles.scheduledContent}>
+                            <Text style={styles.scheduledLabel}>Scheduled Pickup</Text>
+                            <Text style={styles.scheduledTime}>
+                                {new Date(delivery.scheduled_pickup_time).toLocaleDateString('en-US', {
+                                    weekday: 'short',
+                                    month: 'short',
+                                    day: 'numeric'
+                                })} at {new Date(delivery.scheduled_pickup_time).toLocaleTimeString('en-US', {
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                })}
+                            </Text>
+                        </View>
+                        <Ionicons name="time-outline" size={20} color={COLORS.white} style={{ opacity: 0.7 }} />
+                    </View>
+                )}
+
                 <View style={styles.statusCard}>
                     <View style={[styles.statusBadge, { backgroundColor: getStatusColor(delivery?.status) }]}>
                         <Text style={styles.statusText}>{delivery?.status?.replace('_', ' ').toUpperCase()}</Text>
@@ -576,7 +601,7 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
 
             {/* Action Buttons */}
             {nextAction && (
-                <View style={styles.actionContainer}>
+                <View style={[styles.actionContainer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                     {delivery?.status !== 'pending' && (
                         <TouchableOpacity
                             style={styles.failButton}
@@ -802,6 +827,40 @@ const styles = StyleSheet.create({
     priceValue: { fontSize: 32, fontWeight: 'bold', color: COLORS.white, marginTop: 4 },
     marketBadge: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 6 },
     marketText: { color: COLORS.white, fontSize: 11, fontWeight: 'bold' },
+
+    // Scheduled Delivery Banner Styles
+    scheduledDeliveryBanner: {
+        backgroundColor: '#5C6BC0', // Indigo
+        padding: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderBottomWidth: 3,
+        borderBottomColor: '#3F51B5',
+        gap: 12,
+    },
+    scheduledIconContainer: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    scheduledContent: {
+        flex: 1,
+    },
+    scheduledLabel: {
+        fontSize: 11,
+        color: 'rgba(255,255,255,0.8)',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    scheduledTime: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: COLORS.white,
+        marginTop: 2,
+    },
 
     routeSummaryCard: {
         backgroundColor: COLORS.white,

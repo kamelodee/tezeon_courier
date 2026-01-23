@@ -253,21 +253,54 @@ const DeliveriesScreen = ({ navigation, route }) => {
         }
     };
 
+    // Format scheduled pickup time
+    const formatScheduledTime = (dateStr) => {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+
+        const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+        if (date >= today && date < tomorrow) {
+            return `Today at ${timeStr}`;
+        } else if (date >= tomorrow && date < new Date(tomorrow.getTime() + 24 * 60 * 60 * 1000)) {
+            return `Tomorrow at ${timeStr}`;
+        } else {
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ` at ${timeStr}`;
+        }
+    };
+
     const renderDelivery = ({ item }) => {
         const isHistory = filter === 'history';
         const nextDestLat = ['pending', 'accepted'].includes(item.status) ? item.pickup_latitude : item.delivery_latitude;
         const nextDestLng = ['pending', 'accepted'].includes(item.status) ? item.pickup_longitude : item.delivery_longitude;
         const distance = (!isHistory && courierLocation && nextDestLat) ? calculateDistance(courierLocation.latitude, courierLocation.longitude, nextDestLat, nextDestLng) : null;
 
+        // Check if this is a scheduled delivery
+        const isScheduled = item.is_scheduled && item.scheduled_pickup_time;
+
         return (
             <TouchableOpacity
                 style={[
                     styles.deliveryCard,
                     isHistory && item.status === 'delivered' && styles.deliveryCardSuccess,
-                    isHistory && item.status === 'failed' && styles.deliveryCardFailed
+                    isHistory && item.status === 'failed' && styles.deliveryCardFailed,
+                    isScheduled && styles.deliveryCardScheduled
                 ]}
                 onPress={() => navigation.navigate('DeliveryDetails', { deliveryId: item.id })}
             >
+                {/* Scheduled Badge */}
+                {isScheduled && (
+                    <View style={styles.scheduledBanner}>
+                        <Ionicons name="calendar-outline" size={14} color={COLORS.white} />
+                        <Text style={styles.scheduledBannerText}>
+                            Scheduled: {formatScheduledTime(item.scheduled_pickup_time)}
+                        </Text>
+                    </View>
+                )}
+
                 <View style={styles.cardHeader}>
                     <View style={styles.orderInfo}>
                         <Text style={styles.orderNumber}>{item.order_number || `Order #${item.id?.slice(0, 8)}`}</Text>
@@ -592,6 +625,26 @@ const styles = StyleSheet.create({
     deliveryCardFailed: {
         borderLeftWidth: 4,
         borderLeftColor: COLORS.error,
+    },
+    deliveryCardScheduled: {
+        borderTopWidth: 0,
+        overflow: 'hidden',
+    },
+    scheduledBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#5C6BC0', // Indigo color for scheduled
+        marginHorizontal: -16,
+        marginTop: -16,
+        marginBottom: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        gap: 6,
+    },
+    scheduledBannerText: {
+        color: COLORS.white,
+        fontSize: 12,
+        fontWeight: '600',
     },
     cardHeader: {
         flexDirection: 'row',
