@@ -1,11 +1,9 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, Image } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeContext';
-
-const LOGO = require('../../assets/logo.png');
 
 import DashboardScreen from '../screens/DashboardScreen';
 import DeliveriesScreen from '../screens/DeliveriesScreen';
@@ -28,11 +26,6 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                 borderTopColor: colors.border,
             }
         ]}>
-            {/* Tezeon brand mark — sits above the centre Map tab */}
-            <View style={styles.brandMark} pointerEvents="none">
-                <Image source={LOGO} style={styles.brandLogo} resizeMode="contain" />
-            </View>
-
             {state.routes.map((route, index) => {
                 const { options } = descriptors[route.key];
                 const label = options.tabBarLabel || options.title || route.name;
@@ -76,13 +69,16 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                         ]}>
                             <Ionicons
                                 name={getIcon()}
-                                size={24}
+                                size={22}
                                 color={isFocused ? colors.primary : colors.muted}
                             />
-                            <Text style={[
-                                styles.tabLabel,
-                                { color: isFocused ? colors.primary : colors.muted }
-                            ]}>
+                            <Text
+                                style={[
+                                    styles.tabLabel,
+                                    { color: isFocused ? colors.primary : colors.muted }
+                                ]}
+                                numberOfLines={1}
+                            >
                                 {label}
                             </Text>
                         </View>
@@ -111,7 +107,7 @@ const MainTabNavigator = () => {
 const styles = StyleSheet.create({
     tabBar: {
         flexDirection: 'row',
-        paddingTop: 10,
+        paddingTop: 8,
         borderTopWidth: 1,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -2 },
@@ -122,35 +118,21 @@ const styles = StyleSheet.create({
     tabButton: {
         flex: 1,
         alignItems: 'center',
+        justifyContent: 'center',
     },
     tabContent: {
         alignItems: 'center',
+        justifyContent: 'center',
         paddingVertical: 4,
-        paddingHorizontal: 12,
-        borderRadius: 16,
+        paddingHorizontal: 4,
+        borderRadius: 12,
+        width: '100%',
     },
     tabLabel: {
-        fontSize: 11,
-        fontWeight: '500',
-        marginTop: 4,
-    },
-    brandMark: {
-        position: 'absolute',
-        top: -18,
-        left: 0,
-        right: 0,
-        alignItems: 'center',
-        pointerEvents: 'none',
-    },
-    brandLogo: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-        elevation: 6,
+        fontSize: 10.5,
+        fontWeight: '600',
+        marginTop: 3,
+        textAlign: 'center',
     },
 });
 

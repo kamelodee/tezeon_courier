@@ -5,7 +5,6 @@ import {
     StyleSheet,
     Dimensions,
     TouchableOpacity,
-    FlatList,
     Animated,
     Image,
 } from 'react-native';
@@ -14,8 +13,6 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../theme/ThemeContext';
 
-// Full Tezeon lockup rather than the app icon plus a hand-set 'Tezeon' label,
-// which never quite matched the real wordmark's spacing or weight.
 const WORDMARK_DARK_INK = require('../../assets/tezeon-wordmark.png');
 const WORDMARK_LIGHT_INK = require('../../assets/tezeon-wordmark-white.png');
 
@@ -24,32 +21,38 @@ const { width, height } = Dimensions.get('window');
 const slides = [
     {
         id: '1',
+        tag: 'EARN ON YOUR SCHEDULE',
         icon: 'bicycle',
-        title: 'Welcome to Tezeon Courier',
-        description: 'Your partner in delivery excellence. Join thousands of couriers earning on their own schedule.',
-        // Literal, like the sibling slides: this array is module scope, so it
-        // cannot read the theme, and a slide accent is brand orange either way.
+        title: 'Deliver & Keep 100% of Your Earnings',
+        description: 'Connect directly with local stores and businesses across Ghana. Choose jobs on your own terms with zero hidden fees.',
+        highlights: ['Flexible Hours', '0% Commission', 'Instant Job Alerts'],
         color: '#FF6B35',
     },
     {
         id: '2',
-        icon: 'cash-outline',
-        title: 'Earn More, Work Flexibly',
-        description: 'Accept jobs that work for you. Track your earnings in real-time and get paid weekly.',
-        color: '#10B981',
-    },
-    {
-        id: '3',
-        icon: 'navigate-outline',
-        title: 'Smart Navigation',
-        description: 'One-tap navigation to pickup and delivery locations. We integrate with Google Maps, Apple Maps, and Waze.',
+        tag: 'SMART ROUTING',
+        icon: 'navigate',
+        title: 'Smart Navigation & Live Traffic',
+        description: 'One-tap directions to pickup and drop-off points. Seamlessly opens in Google Maps, Apple Maps, or Waze.',
+        highlights: ['Turn-by-Turn GPS', 'Live Distance Tracker', 'Direct Customer Call'],
         color: '#3B82F6',
     },
     {
+        id: '3',
+        tag: 'SECURE HANDOFF',
+        icon: 'shield-checkmark',
+        title: '4-Digit OTP & Verified Handover',
+        description: 'Deliver with total peace of mind. Customers give you a secure verification code and sign digitally upon arrival.',
+        highlights: ['4-Digit Customer OTP', 'Photo Proof of Delivery', 'Digital Signatures'],
+        color: '#10B981',
+    },
+    {
         id: '4',
-        icon: 'diamond-outline',
-        title: 'Go Premium',
-        description: 'Unlock marketplace jobs and earn even more. Premium couriers get priority access to high-value deliveries.',
+        tag: 'INSTANT CASHOUT',
+        icon: 'wallet',
+        title: 'Fast Mobile Money Payouts',
+        description: 'Withdraw your daily and weekly earnings directly to MTN Mobile Money, Telecel Cash, or your local bank account.',
+        highlights: ['MTN & Telecel MoMo', 'Bank Transfers', 'Real-Time Earnings'],
         color: '#F59E0B',
     },
 ];
@@ -57,6 +60,7 @@ const slides = [
 const OnboardingScreen = ({ navigation }) => {
     const theme_hook = useTheme();
     const colors = theme_hook?.colors ?? {};
+    const isDark = theme_hook?.isDark ?? false;
     const styles = useMemo(() => createStyles(colors), [colors]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const scrollX = useRef(new Animated.Value(0)).current;
@@ -66,21 +70,21 @@ const OnboardingScreen = ({ navigation }) => {
         if (currentIndex < slides.length - 1) {
             flatListRef.current?.scrollToIndex({ index: currentIndex + 1 });
         } else {
-            completeOnboarding();
+            completeOnboarding('Register');
         }
     };
 
     const handleSkip = () => {
-        completeOnboarding();
+        completeOnboarding('Login');
     };
 
-    const completeOnboarding = async () => {
+    const completeOnboarding = async (targetScreen = 'Login') => {
         try {
             await AsyncStorage.setItem('hasSeenOnboarding', 'true');
-            navigation.replace('Login');
+            navigation.replace(targetScreen);
         } catch (error) {
             console.error('Error saving onboarding status:', error);
-            navigation.replace('Login');
+            navigation.replace(targetScreen);
         }
     };
 
@@ -101,7 +105,7 @@ const OnboardingScreen = ({ navigation }) => {
 
         const scale = scrollX.interpolate({
             inputRange,
-            outputRange: [0.8, 1, 0.8],
+            outputRange: [0.85, 1, 0.85],
             extrapolate: 'clamp',
         });
 
@@ -113,20 +117,42 @@ const OnboardingScreen = ({ navigation }) => {
 
         return (
             <View style={styles.slide}>
-                <Animated.View style={[styles.iconContainer, { backgroundColor: `${item.color}15`, transform: [{ scale }], opacity }]}>
-                    <View style={[styles.iconInner, { backgroundColor: `${item.color}25` }]}>
-                        <Ionicons name={item.icon} size={80} color={item.color} />
+                {/* Visual Showcase Card */}
+                <Animated.View style={[styles.cardShowcase, { transform: [{ scale }], opacity }]}>
+                    <View style={[styles.haloOuter, { backgroundColor: `${item.color}15` }]}>
+                        <View style={[styles.haloInner, { backgroundColor: `${item.color}25` }]}>
+                            <Ionicons name={item.icon} size={64} color={item.color} />
+                        </View>
+                    </View>
+
+                    {/* Tag badge */}
+                    <View style={[styles.tagBadge, { backgroundColor: `${item.color}20` }]}>
+                        <Text style={[styles.tagText, { color: item.color }]}>{item.tag}</Text>
                     </View>
                 </Animated.View>
-                <Animated.Text style={[styles.title, { opacity }]}>{item.title}</Animated.Text>
-                <Animated.Text style={[styles.description, { opacity }]}>{item.description}</Animated.Text>
+
+                {/* Content */}
+                <Animated.View style={[styles.textSection, { opacity }]}>
+                    <Text style={styles.title}>{item.title}</Text>
+                    <Text style={styles.description}>{item.description}</Text>
+
+                    {/* Highlights Pills */}
+                    <View style={styles.highlightsContainer}>
+                        {item.highlights.map((highlight, idx) => (
+                            <View key={idx} style={styles.highlightPill}>
+                                <Ionicons name="checkmark-circle" size={14} color={item.color} />
+                                <Text style={styles.highlightText}>{highlight}</Text>
+                            </View>
+                        ))}
+                    </View>
+                </Animated.View>
             </View>
         );
     };
 
     const renderDots = () => (
         <View style={styles.dotsContainer}>
-            {slides.map((_, index) => {
+            {slides.map((slide, index) => {
                 const inputRange = [
                     (index - 1) * width,
                     index * width,
@@ -135,13 +161,13 @@ const OnboardingScreen = ({ navigation }) => {
 
                 const dotWidth = scrollX.interpolate({
                     inputRange,
-                    outputRange: [8, 24, 8],
+                    outputRange: [8, 28, 8],
                     extrapolate: 'clamp',
                 });
 
                 const dotOpacity = scrollX.interpolate({
                     inputRange,
-                    outputRange: [0.3, 1, 0.3],
+                    outputRange: [0.25, 1, 0.25],
                     extrapolate: 'clamp',
                 });
 
@@ -162,25 +188,31 @@ const OnboardingScreen = ({ navigation }) => {
         </View>
     );
 
+    const isLastSlide = currentIndex === slides.length - 1;
+
     return (
-        <SafeAreaView style={styles.container}>
-            {/* Logo */}
-            <View style={styles.logoRow}>
+        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+            {/* Top Navigation Bar */}
+            <View style={styles.topBar}>
                 <Image
-                    source={theme_hook?.isDark ? WORDMARK_LIGHT_INK : WORDMARK_DARK_INK}
+                    source={isDark ? WORDMARK_LIGHT_INK : WORDMARK_DARK_INK}
                     style={styles.wordmark}
                     resizeMode="contain"
                     accessibilityRole="image"
                     accessibilityLabel="Tezeon"
                 />
+
+                {!isLastSlide ? (
+                    <TouchableOpacity style={styles.skipPill} onPress={handleSkip}>
+                        <Text style={styles.skipText}>Skip</Text>
+                        <Ionicons name="chevron-forward" size={14} color={colors.muted} />
+                    </TouchableOpacity>
+                ) : (
+                    <View style={{ width: 60 }} />
+                )}
             </View>
 
-            {/* Skip Button */}
-            <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-                <Text style={styles.skipText}>Skip</Text>
-            </TouchableOpacity>
-
-            {/* Slides */}
+            {/* Carousel Slides */}
             <Animated.FlatList
                 ref={flatListRef}
                 data={slides}
@@ -203,19 +235,47 @@ const OnboardingScreen = ({ navigation }) => {
             <View style={styles.bottomContainer}>
                 {renderDots()}
 
-                <TouchableOpacity
-                    style={[styles.nextButton, { backgroundColor: slides[currentIndex].color }]}
-                    onPress={handleNext}
-                >
-                    {currentIndex === slides.length - 1 ? (
-                        <Text style={styles.nextButtonText}>Get Started</Text>
-                    ) : (
-                        <>
-                            <Text style={styles.nextButtonText}>Next</Text>
+                {isLastSlide ? (
+                    <View style={styles.actionGroup}>
+                        <TouchableOpacity
+                            style={[styles.primaryButton, { backgroundColor: slides[currentIndex].color }]}
+                            onPress={() => completeOnboarding('Register')}
+                            activeOpacity={0.85}
+                        >
+                            <Text style={styles.primaryButtonText}>Register as Courier</Text>
                             <Ionicons name="arrow-forward" size={20} color={colors.white} />
-                        </>
-                    )}
-                </TouchableOpacity>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.secondaryLink}
+                            onPress={() => completeOnboarding('Login')}
+                        >
+                            <Text style={styles.secondaryLinkText}>
+                                Already have an account? <Text style={[styles.boldLink, { color: colors.primary }]}>Sign In</Text>
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <View style={styles.actionGroup}>
+                        <TouchableOpacity
+                            style={[styles.primaryButton, { backgroundColor: slides[currentIndex].color }]}
+                            onPress={handleNext}
+                            activeOpacity={0.85}
+                        >
+                            <Text style={styles.primaryButtonText}>Next</Text>
+                            <Ionicons name="arrow-forward" size={20} color={colors.white} />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.secondaryLink}
+                            onPress={() => completeOnboarding('Login')}
+                        >
+                            <Text style={styles.secondaryLinkText}>
+                                Already registered? <Text style={[styles.boldLink, { color: colors.primary }]}>Sign In</Text>
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
             </View>
         </SafeAreaView>
     );
@@ -224,93 +284,163 @@ const OnboardingScreen = ({ navigation }) => {
 const createStyles = (colors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.white,
+        backgroundColor: colors.background,
     },
-    logoRow: {
+    topBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 24,
-        paddingTop: 16,
-        gap: 8,
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingTop: 8,
+        paddingBottom: 4,
+        zIndex: 10,
     },
     wordmark: {
-        width: 150,
-        height: 34,
+        width: 140,
+        height: 32,
     },
-    skipButton: {
-        position: 'absolute',
-        top: 60,
-        right: 20,
-        zIndex: 10,
-        padding: 10,
+    skipPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: `${colors.muted}15`,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        gap: 2,
     },
     skipText: {
-        fontSize: 16,
+        fontSize: 13,
+        fontWeight: '600',
         color: colors.muted,
-        fontWeight: '500',
     },
     slide: {
         width,
         alignItems: 'center',
-        paddingHorizontal: 40,
-        paddingTop: height * 0.15,
+        justifyContent: 'center',
+        paddingHorizontal: 24,
     },
-    iconContainer: {
-        width: 200,
-        height: 200,
-        borderRadius: 100,
+    cardShowcase: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 28,
+    },
+    haloOuter: {
+        width: 170,
+        height: 170,
+        borderRadius: 85,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 40,
     },
-    iconInner: {
-        width: 160,
-        height: 160,
-        borderRadius: 80,
+    haloInner: {
+        width: 130,
+        height: 130,
+        borderRadius: 65,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    tagBadge: {
+        marginTop: 16,
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    tagText: {
+        fontSize: 11,
+        fontWeight: '800',
+        letterSpacing: 0.8,
+    },
+    textSection: {
+        alignItems: 'center',
+        width: '100%',
+        paddingHorizontal: 8,
     },
     title: {
-        fontSize: 28,
-        fontWeight: 'bold',
+        fontSize: 24,
+        fontWeight: '800',
         color: colors.text,
         textAlign: 'center',
-        marginBottom: 16,
+        marginBottom: 10,
+        lineHeight: 32,
     },
     description: {
-        fontSize: 16,
+        fontSize: 14,
         color: colors.muted,
         textAlign: 'center',
-        lineHeight: 24,
+        lineHeight: 22,
+        marginBottom: 18,
+    },
+    highlightsContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        gap: 8,
+        marginTop: 4,
+    },
+    highlightPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.card,
+        borderWidth: 1,
+        borderColor: colors.border,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 16,
+        gap: 6,
+    },
+    highlightText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: colors.text,
     },
     bottomContainer: {
-        paddingHorizontal: 20,
-        paddingBottom: 40,
+        paddingHorizontal: 24,
+        paddingBottom: 24,
         alignItems: 'center',
+        width: '100%',
     },
     dotsContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 30,
+        marginBottom: 24,
+        gap: 6,
     },
     dot: {
-        height: 8,
-        borderRadius: 4,
-        marginHorizontal: 4,
+        height: 6,
+        borderRadius: 3,
     },
-    nextButton: {
+    actionGroup: {
+        width: '100%',
+        alignItems: 'center',
+        gap: 12,
+    },
+    primaryButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         width: '100%',
-        paddingVertical: 16,
-        borderRadius: 12,
+        paddingVertical: 15,
+        borderRadius: 14,
         gap: 8,
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
     },
-    nextButtonText: {
-        fontSize: 18,
-        fontWeight: '600',
+    primaryButtonText: {
+        fontSize: 16,
+        fontWeight: '700',
         color: colors.white,
+    },
+    secondaryLink: {
+        paddingVertical: 6,
+    },
+    secondaryLinkText: {
+        fontSize: 13,
+        color: colors.muted,
+    },
+    boldLink: {
+        fontWeight: '700',
     },
 });
 

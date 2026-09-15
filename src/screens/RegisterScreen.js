@@ -260,7 +260,7 @@ const RegisterScreen = ({ navigation }) => {
 const createStyles = (colors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.white,
+        backgroundColor: colors.background,
     },
     scrollContent: {
         flexGrow: 1,
@@ -290,7 +290,7 @@ const createStyles = (colors) => StyleSheet.create({
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.background,
+        backgroundColor: colors.card,
         borderRadius: 12,
         paddingHorizontal: 16,
         marginBottom: 16,
@@ -320,7 +320,7 @@ const createStyles = (colors) => StyleSheet.create({
     vehicleOption: {
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: colors.background,
+        backgroundColor: colors.card,
         borderRadius: 12,
         padding: 16,
         marginRight: 12,

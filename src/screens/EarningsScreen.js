@@ -182,14 +182,14 @@ const EarningsScreen = ({ navigation }) => {
     };
 
     const getTypeColor = (type) => {
-        const colors = {
+        const colorMap = {
             delivery: colors.primary,
             tip: colors.success,
             bonus: colors.warning,
             payout: colors.muted,
             deduction: colors.error
         };
-        return colors[type] || colors.text;
+        return colorMap[type] || colors.text;
     };
 
     const renderEarning = ({ item }) => (

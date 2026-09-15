@@ -210,7 +210,7 @@ const DeliveriesScreen = ({ navigation, route }) => {
     }, [filter, dateFilter]);
 
     const getStatusColor = (status) => {
-        const colors = {
+        const colorMap = {
             pending: colors.warning,
             accepted: colors.primary,
             picked_up: colors.primaryDark,
@@ -221,7 +221,7 @@ const DeliveriesScreen = ({ navigation, route }) => {
             cancelled: colors.muted,
             returned: colors.warning
         };
-        return colors[status] || colors.muted;
+        return colorMap[status] || colors.muted;
     };
 
     const getStatusIcon = (status) => {
@@ -446,7 +446,10 @@ const DeliveriesScreen = ({ navigation, route }) => {
             style={[styles.dateChip, dateFilter === value && styles.dateChipActive]}
             onPress={() => setDateFilter(value)}
         >
-            <Text style={[styles.dateChipText, dateFilter === value && styles.dateChipTextActive]}>
+            <Text
+                style={[styles.dateChipText, dateFilter === value && styles.dateChipTextActive]}
+                numberOfLines={1}
+            >
                 {label}
             </Text>
         </TouchableOpacity>
@@ -515,7 +518,7 @@ const DeliveriesScreen = ({ navigation, route }) => {
             </View>
 
             {/* Filter Tabs */}
-            <View style={[styles.filterContainer, { backgroundColor: colors.white }]}>
+            <View style={styles.filterContainer}>
                 <FilterTab status="active" label="Active" icon="bicycle-outline" />
                 <FilterTab
                     status="available"
@@ -585,7 +588,9 @@ const createStyles = (colors) => StyleSheet.create({
     filterContainer: {
         flexDirection: 'row',
         padding: 12,
-        backgroundColor: colors.white,
+        backgroundColor: colors.card,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
         gap: 8,
     },
     filterTab: {
@@ -594,7 +599,7 @@ const createStyles = (colors) => StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 10,
-        paddingHorizontal: 12,
+        paddingHorizontal: 10,
         borderRadius: 8,
         backgroundColor: `${colors.primary}10`,
         gap: 6,
@@ -607,7 +612,7 @@ const createStyles = (colors) => StyleSheet.create({
 
     // History Header Styles
     historyHeader: {
-        backgroundColor: colors.white,
+        backgroundColor: colors.card,
         paddingHorizontal: 12,
         paddingBottom: 12,
         borderBottomWidth: 1,
@@ -642,18 +647,20 @@ const createStyles = (colors) => StyleSheet.create({
     dateChip: {
         flex: 1,
         paddingVertical: 8,
-        paddingHorizontal: 10,
+        paddingHorizontal: 4,
         borderRadius: 20,
         backgroundColor: colors.background,
         alignItems: 'center',
+        justifyContent: 'center',
     },
     dateChipActive: {
         backgroundColor: colors.primary,
     },
     dateChipText: {
-        fontSize: 11,
+        fontSize: 10.5,
         fontWeight: '600',
         color: colors.muted,
+        textAlign: 'center',
     },
     dateChipTextActive: {
         color: colors.white,
@@ -662,7 +669,7 @@ const createStyles = (colors) => StyleSheet.create({
     listContent: { padding: 12, paddingBottom: 100 },
 
     deliveryCard: {
-        backgroundColor: colors.white,
+        backgroundColor: colors.card,
         borderRadius: 12,
         padding: 16,
         marginBottom: 12,
@@ -671,6 +678,8 @@ const createStyles = (colors) => StyleSheet.create({
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
+        borderWidth: 1,
+        borderColor: colors.border,
     },
     deliveryCardSuccess: {
         borderLeftWidth: 4,

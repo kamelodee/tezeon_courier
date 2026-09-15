@@ -403,7 +403,7 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
     };
 
     const getStatusColor = (status) => {
-        const colors = {
+        const colorMap = {
             pending: colors.warning,
             accepted: colors.primary,
             picked_up: colors.primaryDark,
@@ -412,7 +412,7 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
             delivered: colors.success,
             failed: colors.error
         };
-        return colors[status] || colors.muted;
+        return colorMap[status] || colors.muted;
     };
 
     const getNextAction = () => {
