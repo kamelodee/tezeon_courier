@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     View,
     Text,
@@ -7,11 +7,13 @@ import {
     TouchableOpacity,
     Linking,
     TextInput,
-    Alert
+    Alert,
+    ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../theme/colors';
+import courierApi from '../services/courierApi';
+import { useTheme } from '../theme/ThemeContext';
 
 const faqs = [
     {
@@ -52,8 +54,12 @@ const faqs = [
 ];
 
 const HelpSupportScreen = ({ navigation }) => {
+    const theme_hook = useTheme();
+    const colors = theme_hook?.colors ?? {};
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const [expandedId, setExpandedId] = useState(null);
     const [message, setMessage] = useState('');
+    const [sending, setSending] = useState(false);
 
     const toggleFaq = (id) => {
         setExpandedId(expandedId === id ? null : id);
@@ -73,17 +79,31 @@ const HelpSupportScreen = ({ navigation }) => {
         }
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (!message.trim()) {
             Alert.alert('Error', 'Please enter your message');
             return;
         }
-        // In production, this would send to backend
-        Alert.alert(
-            'Message Sent',
-            'Thank you for contacting us. We\'ll get back to you within 24 hours.',
-            [{ text: 'OK', onPress: () => setMessage('') }]
-        );
+        setSending(true);
+        try {
+            const response = await courierApi.reportIssue({
+                issue_type: 'general',
+                description: message.trim(),
+            });
+            if (response.success) {
+                Alert.alert(
+                    'Message Sent',
+                    "Thank you for contacting us. We'll get back to you within 24 hours.",
+                    [{ text: 'OK', onPress: () => setMessage('') }]
+                );
+            } else {
+                Alert.alert('Error', response.error || 'Failed to send message. Please try again.');
+            }
+        } catch {
+            Alert.alert('Error', 'An error occurred. Please try again.');
+        } finally {
+            setSending(false);
+        }
     };
 
     const ContactCard = ({ icon, title, subtitle, onPress, color }) => (
@@ -95,7 +115,7 @@ const HelpSupportScreen = ({ navigation }) => {
                 <Text style={styles.contactTitle}>{title}</Text>
                 <Text style={styles.contactSubtitle}>{subtitle}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={COLORS.muted} />
+            <Ionicons name="chevron-forward" size={20} color={colors.muted} />
         </TouchableOpacity>
     );
 
@@ -104,7 +124,7 @@ const HelpSupportScreen = ({ navigation }) => {
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                    <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+                    <Ionicons name="arrow-back" size={24} color={colors.white} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Help & Support</Text>
                 <View style={{ width: 40 }} />
@@ -155,7 +175,7 @@ const HelpSupportScreen = ({ navigation }) => {
                                     <Ionicons
                                         name={expandedId === faq.id ? 'chevron-up' : 'chevron-down'}
                                         size={20}
-                                        color={COLORS.muted}
+                                        color={colors.muted}
                                     />
                                 </View>
                                 {expandedId === faq.id && (
@@ -173,16 +193,25 @@ const HelpSupportScreen = ({ navigation }) => {
                         <TextInput
                             style={styles.messageInput}
                             placeholder="Describe your issue or question..."
-                            placeholderTextColor={COLORS.muted}
+                            placeholderTextColor={colors.muted}
                             multiline
                             numberOfLines={4}
                             value={message}
                             onChangeText={setMessage}
                             textAlignVertical="top"
                         />
-                        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-                            <Text style={styles.submitText}>Send Message</Text>
-                            <Ionicons name="send" size={18} color={COLORS.white} />
+                        <TouchableOpacity
+                            style={[styles.submitButton, sending && { opacity: 0.7 }]}
+                            onPress={handleSubmit}
+                            disabled={sending}
+                        >
+                            {sending
+                                ? <ActivityIndicator color={colors.white} />
+                                : <>
+                                    <Text style={styles.submitText}>Send Message</Text>
+                                    <Ionicons name="send" size={18} color={colors.white} />
+                                </>
+                            }
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -190,7 +219,7 @@ const HelpSupportScreen = ({ navigation }) => {
                 {/* Emergency */}
                 <View style={styles.emergencyCard}>
                     <View style={styles.emergencyIcon}>
-                        <Ionicons name="warning" size={24} color={COLORS.error} />
+                        <Ionicons name="warning" size={24} color={colors.error} />
                     </View>
                     <View style={styles.emergencyContent}>
                         <Text style={styles.emergencyTitle}>Emergency?</Text>
@@ -206,16 +235,16 @@ const HelpSupportScreen = ({ navigation }) => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         paddingHorizontal: 16,
         paddingVertical: 16,
     },
@@ -230,7 +259,7 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: COLORS.white,
+        color: colors.white,
     },
     content: {
         flex: 1,
@@ -242,12 +271,12 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 11,
         fontWeight: '600',
-        color: COLORS.muted,
+        color: colors.muted,
         marginBottom: 12,
         letterSpacing: 0.5,
     },
     contactCards: {
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderRadius: 12,
         overflow: 'hidden',
     },
@@ -256,7 +285,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 16,
         borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
+        borderBottomColor: colors.border,
     },
     contactIcon: {
         width: 48,
@@ -272,22 +301,22 @@ const styles = StyleSheet.create({
     contactTitle: {
         fontSize: 15,
         fontWeight: '600',
-        color: COLORS.text,
+        color: colors.text,
     },
     contactSubtitle: {
         fontSize: 12,
-        color: COLORS.muted,
+        color: colors.muted,
         marginTop: 2,
     },
     faqList: {
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderRadius: 12,
         overflow: 'hidden',
     },
     faqItem: {
         padding: 16,
         borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
+        borderBottomColor: colors.border,
     },
     faqQuestion: {
         flexDirection: 'row',
@@ -298,34 +327,34 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 14,
         fontWeight: '500',
-        color: COLORS.text,
+        color: colors.text,
         marginRight: 12,
     },
     faqAnswer: {
         fontSize: 13,
-        color: COLORS.muted,
+        color: colors.muted,
         marginTop: 12,
         lineHeight: 20,
     },
     messageCard: {
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderRadius: 12,
         padding: 16,
     },
     messageInput: {
         borderWidth: 1,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
         borderRadius: 8,
         padding: 12,
         fontSize: 14,
-        color: COLORS.text,
+        color: colors.text,
         minHeight: 100,
     },
     submitButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         paddingVertical: 14,
         borderRadius: 8,
         marginTop: 12,
@@ -334,7 +363,7 @@ const styles = StyleSheet.create({
     submitText: {
         fontSize: 16,
         fontWeight: '600',
-        color: COLORS.white,
+        color: colors.white,
     },
     emergencyCard: {
         flexDirection: 'row',
@@ -343,7 +372,7 @@ const styles = StyleSheet.create({
         padding: 16,
         borderRadius: 12,
         borderLeftWidth: 4,
-        borderLeftColor: COLORS.error,
+        borderLeftColor: colors.error,
     },
     emergencyIcon: {
         marginRight: 12,
@@ -354,7 +383,7 @@ const styles = StyleSheet.create({
     emergencyTitle: {
         fontSize: 14,
         fontWeight: 'bold',
-        color: COLORS.error,
+        color: colors.error,
     },
     emergencyText: {
         fontSize: 13,

@@ -10,6 +10,7 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import DeliveryDetailsScreen from '../screens/DeliveryDetailsScreen';
+import FailedDeliveryScreen from '../screens/FailedDeliveryScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import VerificationScreen from '../screens/VerificationScreen';
 import LocationSettingsScreen from '../screens/LocationSettingsScreen';
@@ -21,6 +22,7 @@ import VehicleSetupScreen from '../screens/VehicleSetupScreen';
 import RoutePlanningScreen from '../screens/RoutePlanningScreen';
 import PayoutScreen from '../screens/PayoutScreen';
 import SupportTicketScreen from '../screens/SupportTicketScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
 import MainTabNavigator from './MainTabNavigator';
 import courierApi from '../services/courierApi';
 import notificationService from '../services/notificationService';
@@ -68,10 +70,30 @@ const AppNavigator = () => {
                 AsyncStorage.getItem('authToken'),
                 AsyncStorage.getItem('hasSeenOnboarding')
             ]);
-            setIsLoggedIn(!!token);
             setHasSeenOnboarding(!!onboardingStatus);
+
+            if (!token) {
+                setIsLoggedIn(false);
+                return;
+            }
+
+            // Validate the token is still usable by fetching the courier profile.
+            // This also catches the case where an employee was assigned but the
+            // token was stored before the CourierProfile existed.
+            const profile = await courierApi.getProfile();
+            if (profile.success) {
+                setIsLoggedIn(true);
+                // Store employee flag for use across the app
+                const isEmployee = !!profile.data?.employer_name;
+                await AsyncStorage.setItem('isEmployeeCourier', isEmployee ? 'true' : 'false');
+            } else {
+                // Token exists but profile is gone or not a courier — force re-login
+                await courierApi.logout();
+                setIsLoggedIn(false);
+            }
         } catch (error) {
             console.error('Auth check error:', error);
+            setIsLoggedIn(false);
         } finally {
             setIsLoading(false);
         }
@@ -107,6 +129,11 @@ const AppNavigator = () => {
                 <Stack.Screen
                     name="DeliveryDetails"
                     component={DeliveryDetailsScreen}
+                    options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                    name="FailedDelivery"
+                    component={FailedDeliveryScreen}
                     options={{ headerShown: false }}
                 />
                 <Stack.Screen
@@ -157,6 +184,11 @@ const AppNavigator = () => {
                 <Stack.Screen
                     name="SupportTicket"
                     component={SupportTicketScreen}
+                    options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                    name="Notifications"
+                    component={NotificationsScreen}
                     options={{ headerShown: false }}
                 />
             </Stack.Navigator>

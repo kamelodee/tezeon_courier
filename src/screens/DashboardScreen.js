@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -11,21 +11,29 @@ import {
     useWindowDimensions,
     Linking,
     Platform,
-    Animated
+    Animated,
+    Modal,
+    TextInput,
+    Image,
 } from 'react-native';
+
+const LOGO = require('../../assets/logo.png');
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../theme/colors';
 import courierApi from '../services/courierApi';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import backgroundService from '../services/backgroundService';
+import { useTheme } from '../theme/ThemeContext';
 
 // Daily goal defaults
 const DEFAULT_DAILY_GOAL = 5;
 const DEFAULT_EARNINGS_GOAL = 50;
 
 const DashboardScreen = ({ navigation }) => {
+    const theme_hook = useTheme();
+    const colors = theme_hook?.colors ?? {};
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [profile, setProfile] = useState(null);
@@ -36,6 +44,9 @@ const DashboardScreen = ({ navigation }) => {
     const [dailyGoal, setDailyGoal] = useState(DEFAULT_DAILY_GOAL);
     const [earningsGoal, setEarningsGoal] = useState(DEFAULT_EARNINGS_GOAL);
     const [streak, setStreak] = useState(0);
+    const [showGoalModal, setShowGoalModal] = useState(false);
+    const [editDeliveryGoal, setEditDeliveryGoal] = useState('');
+    const [editEarningsGoal, setEditEarningsGoal] = useState('');
     const { width } = useWindowDimensions();
     const isTablet = width > 600;
     const isLargeTablet = width > 900;
@@ -132,7 +143,7 @@ const DashboardScreen = ({ navigation }) => {
         );
     };
 
-    const StatCard = ({ icon, title, value, color = COLORS.primary, style }) => (
+    const StatCard = ({ icon, title, value, color = colors.primary, style }) => (
         <View style={[styles.statCard, style]}>
             <View style={[styles.statIcon, { backgroundColor: `${color}15` }]}>
                 <Ionicons name={icon} size={24} color={color} />
@@ -184,9 +195,9 @@ const DashboardScreen = ({ navigation }) => {
 
                 <View style={styles.deliveryPath}>
                     <View style={styles.pathIcon}>
-                        <View style={[styles.pathDot, { backgroundColor: COLORS.success }]} />
+                        <View style={[styles.pathDot, { backgroundColor: colors.success }]} />
                         <View style={styles.pathLine} />
-                        <View style={[styles.pathDot, { backgroundColor: COLORS.error }]} />
+                        <View style={[styles.pathDot, { backgroundColor: colors.error }]} />
                     </View>
                     <View style={styles.pathText}>
                         <Text style={styles.pathAddress} numberOfLines={1}>{delivery.pickup_address || 'Seller Location'}</Text>
@@ -197,7 +208,7 @@ const DashboardScreen = ({ navigation }) => {
 
                 <View style={styles.deliveryFooterPremium}>
                     <View style={styles.customerRow}>
-                        <Ionicons name="person" size={14} color={COLORS.muted} />
+                        <Ionicons name="person" size={14} color={colors.muted} />
                         <Text style={styles.customerTextPremium}>{delivery.delivery_contact_name}</Text>
                     </View>
 
@@ -209,7 +220,7 @@ const DashboardScreen = ({ navigation }) => {
                             openNavigation(nextDestLat, nextDestLng, nextAddress);
                         }}
                     >
-                        <Ionicons name="navigate" size={16} color={COLORS.white} />
+                        <Ionicons name="navigate" size={16} color={colors.white} />
                         <Text style={styles.quickNavText}>Navigate</Text>
                     </TouchableOpacity>
                 </View>
@@ -220,17 +231,17 @@ const DashboardScreen = ({ navigation }) => {
     const getStatusColor = (status) => {
         switch (status) {
             case 'pending':
-                return COLORS.warning;
+                return colors.warning;
             case 'accepted':
-                return COLORS.info;
+                return colors.info;
             case 'picked_up':
-                return COLORS.secondary;
+                return colors.secondary;
             case 'delivered':
-                return COLORS.success;
+                return colors.success;
             case 'cancelled':
-                return COLORS.error;
+                return colors.error;
             default:
-                return COLORS.muted;
+                return colors.muted;
         }
     };
 
@@ -348,6 +359,24 @@ const DashboardScreen = ({ navigation }) => {
         }
     };
 
+    const openGoalModal = () => {
+        setEditDeliveryGoal(String(dailyGoal));
+        setEditEarningsGoal(String(earningsGoal));
+        setShowGoalModal(true);
+    };
+
+    const saveGoals = async () => {
+        const dg = parseInt(editDeliveryGoal);
+        const eg = parseFloat(editEarningsGoal);
+        if (!dg || dg < 1) { Alert.alert('Invalid', 'Delivery goal must be at least 1'); return; }
+        if (!eg || eg < 1) { Alert.alert('Invalid', 'Earnings goal must be at least ₵1'); return; }
+        setDailyGoal(dg);
+        setEarningsGoal(eg);
+        await AsyncStorage.setItem('dailyDeliveryGoal', String(dg));
+        await AsyncStorage.setItem('dailyEarningsGoal', String(eg));
+        setShowGoalModal(false);
+    };
+
     // Calculate progress percentages
     const deliveryProgress = Math.min(((dashboard?.today_deliveries || 0) / dailyGoal) * 100, 100);
     const earningsProgress = Math.min(((dashboard?.today_earnings || 0) / earningsGoal) * 100, 100);
@@ -357,7 +386,7 @@ const DashboardScreen = ({ navigation }) => {
         return (
             <SafeAreaView style={styles.container}>
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={COLORS.primary} />
+                    <ActivityIndicator size="large" color={colors.primary} />
                 </View>
             </SafeAreaView>
         );
@@ -368,24 +397,36 @@ const DashboardScreen = ({ navigation }) => {
             <View style={styles.headerPremium}>
                 <View style={styles.headerMain}>
                     <View style={styles.userInfo}>
+                        <View style={styles.headerLogoRow}>
+                            <Image source={LOGO} style={styles.headerLogo} resizeMode="contain" />
+                            <Text style={styles.headerLogoName}>Tezeon</Text>
+                        </View>
                         <Text style={styles.greetingHeader}>Welcome back,</Text>
                         <Text style={styles.userNameHeader}>{profile?.full_name?.split(' ')[0] || 'Courier'}</Text>
                     </View>
+                    <View style={styles.headerActions}>
+                        <TouchableOpacity
+                            onPress={() => navigation.navigate('Notifications')}
+                            style={styles.notifBtn}
+                        >
+                            <Ionicons name="notifications-outline" size={22} color={colors.text} />
+                        </TouchableOpacity>
+                    </View>
                     <View style={styles.statusControl}>
                         {togglingStatus ? (
-                            <ActivityIndicator size="small" color={COLORS.primary} />
+                            <ActivityIndicator size="small" color={colors.primary} />
                         ) : (
                             <TouchableOpacity
                                 onPress={toggleOnlineStatus}
                                 style={[
                                     styles.statusToggleBtn,
-                                    { backgroundColor: isOnline ? COLORS.success : '#94A3B8' }
+                                    { backgroundColor: isOnline ? colors.success : '#94A3B8' }
                                 ]}
                             >
                                 <Ionicons
                                     name={isOnline ? "radio-button-on" : "radio-button-off"}
                                     size={16}
-                                    color={COLORS.white}
+                                    color={colors.white}
                                 />
                                 <Text style={styles.statusToggleText}>
                                     {isOnline ? 'ONLINE' : 'OFFLINE'}
@@ -410,7 +451,7 @@ const DashboardScreen = ({ navigation }) => {
                 <View style={styles.goalCard}>
                     <View style={styles.goalHeader}>
                         <View style={styles.goalTitleRow}>
-                            <Ionicons name="trophy" size={24} color={goalReached ? COLORS.warning : COLORS.primary} />
+                            <Ionicons name="trophy" size={24} color={goalReached ? colors.warning : colors.primary} />
                             <Text style={styles.goalTitle}>Today's Goal</Text>
                             {streak > 0 && (
                                 <View style={styles.streakBadge}>
@@ -419,12 +460,17 @@ const DashboardScreen = ({ navigation }) => {
                                 </View>
                             )}
                         </View>
-                        {goalReached && (
-                            <View style={styles.goalReachedBadge}>
-                                <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
-                                <Text style={styles.goalReachedText}>Goal Reached!</Text>
-                            </View>
-                        )}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            {goalReached && (
+                                <View style={styles.goalReachedBadge}>
+                                    <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+                                    <Text style={styles.goalReachedText}>Goal Reached!</Text>
+                                </View>
+                            )}
+                            <TouchableOpacity onPress={openGoalModal} style={styles.editGoalBtn}>
+                                <Ionicons name="pencil" size={14} color={colors.muted} />
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     {/* Deliveries Progress */}
@@ -444,7 +490,7 @@ const DashboardScreen = ({ navigation }) => {
                                             inputRange: [0, 1],
                                             outputRange: ['0%', '100%']
                                         }),
-                                        backgroundColor: goalReached ? COLORS.success : COLORS.primary
+                                        backgroundColor: goalReached ? colors.success : colors.primary
                                     }
                                 ]}
                             />
@@ -465,7 +511,7 @@ const DashboardScreen = ({ navigation }) => {
                                     styles.progressBarFill,
                                     {
                                         width: `${earningsProgress}%`,
-                                        backgroundColor: earningsProgress >= 100 ? COLORS.success : COLORS.warning
+                                        backgroundColor: earningsProgress >= 100 ? colors.success : colors.warning
                                     }
                                 ]}
                             />
@@ -481,20 +527,32 @@ const DashboardScreen = ({ navigation }) => {
                     </Text>
                 </View>
 
-                {/* Verification Notice */}
-                {!profile?.is_verified && (
+                {/* Employee fleet badge */}
+                {!!profile?.employer_name && (
+                    <View style={styles.employeeBadge}>
+                        <Ionicons name="business" size={16} color={colors.primary} />
+                        <Text style={styles.employeeBadgeText}>
+                            {profile.employer_name} Fleet
+                        </Text>
+                        <View style={styles.employeeVerifiedDot} />
+                        <Text style={styles.employeeVerifiedText}>Verified</Text>
+                    </View>
+                )}
+
+                {/* Verification Notice — only for freelance couriers who aren't verified */}
+                {!profile?.is_verified && !profile?.employer_name && (
                     <TouchableOpacity
                         style={styles.verificationNotice}
                         onPress={() => navigation.navigate('Verification', { profile })}
                     >
                         <View style={styles.noticeIcon}>
-                            <Ionicons name="alert-circle" size={24} color={COLORS.warning} />
+                            <Ionicons name="alert-circle" size={24} color={colors.warning} />
                         </View>
                         <View style={styles.noticeContent}>
                             <Text style={styles.noticeTitle}>Complete Your Profile</Text>
                             <Text style={styles.noticeSubtitle}>Upload Ghana Card and License to get verified.</Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={20} color={COLORS.muted} />
+                        <Ionicons name="chevron-forward" size={20} color={colors.muted} />
                     </TouchableOpacity>
                 )}
 
@@ -504,28 +562,28 @@ const DashboardScreen = ({ navigation }) => {
                         icon="bicycle"
                         title="Today's Deliveries"
                         value={dashboard?.today_deliveries || 0}
-                        color={COLORS.primary}
+                        color={colors.primary}
                         style={{ width: isTablet ? (width - 60) / 4 : (width - 40) / 2 }}
                     />
                     <StatCard
                         icon="cash"
                         title="Today's Earnings"
                         value={`₵${parseFloat(dashboard?.today_earnings || 0).toFixed(2)}`}
-                        color={COLORS.success}
+                        color={colors.success}
                         style={{ width: isTablet ? (width - 60) / 4 : (width - 40) / 2 }}
                     />
                     <StatCard
                         icon="time"
                         title="Pending"
                         value={dashboard?.pending_deliveries || 0}
-                        color={COLORS.warning}
+                        color={colors.warning}
                         style={{ width: isTablet ? (width - 60) / 4 : (width - 40) / 2 }}
                     />
                     <StatCard
                         icon="star"
                         title="Rating"
                         value={parseFloat(dashboard?.average_rating || 5).toFixed(1)}
-                        color={COLORS.secondary}
+                        color={colors.secondary}
                         style={{ width: isTablet ? (width - 60) / 4 : (width - 40) / 2 }}
                     />
                 </View>
@@ -537,7 +595,7 @@ const DashboardScreen = ({ navigation }) => {
                 >
                     <View style={styles.walletHeader}>
                         <View style={styles.walletIconContainer}>
-                            <Ionicons name="wallet" size={28} color={COLORS.white} />
+                            <Ionicons name="wallet" size={28} color={colors.white} />
                         </View>
                         <View style={styles.walletInfo}>
                             <Text style={styles.walletLabel}>Wallet Balance</Text>
@@ -583,13 +641,13 @@ const DashboardScreen = ({ navigation }) => {
                     >
                         <View style={styles.routePlanningContent}>
                             <View style={styles.routePlanningIconContainer}>
-                                <Ionicons name="map" size={24} color={COLORS.white} />
+                                <Ionicons name="map" size={24} color={colors.white} />
                             </View>
                             <View style={styles.routePlanningTextContainer}>
                                 <Text style={styles.routePlanningTitle}>Optimize Route</Text>
                                 <Text style={styles.routePlanningSubtitle}>View all {activeDeliveries.length} stops on map</Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={20} color={COLORS.primary} />
+                            <Ionicons name="chevron-forward" size={20} color={colors.primary} />
                         </View>
                     </TouchableOpacity>
                 )}
@@ -612,9 +670,9 @@ const DashboardScreen = ({ navigation }) => {
                             ))
                         ) : (
                             <View style={styles.emptyState}>
-                                <Ionicons name="bicycle-outline" size={48} color={COLORS.muted} />
+                                <Ionicons name="bicycle-outline" size={48} color={colors.muted} />
                                 <Text style={styles.emptyText}>No active deliveries</Text>
-                                {!!isOnline && (
+                                {!!isOnline && !profile?.employer_name && (
                                     <TouchableOpacity
                                         style={styles.findButton}
                                         onPress={() => navigation.navigate('Deliveries', { filter: 'available' })}
@@ -637,8 +695,8 @@ const DashboardScreen = ({ navigation }) => {
                             style={[styles.actionButton, isTablet && { flex: 0, width: (width - 80) / 3 }]}
                             onPress={() => navigation.navigate('Deliveries')}
                         >
-                            <View style={[styles.actionIcon, { backgroundColor: `${COLORS.primary}15` }]}>
-                                <Ionicons name="list" size={24} color={COLORS.primary} />
+                            <View style={[styles.actionIcon, { backgroundColor: `${colors.primary}15` }]}>
+                                <Ionicons name="list" size={24} color={colors.primary} />
                             </View>
                             <Text style={styles.actionText}>All Deliveries</Text>
                         </TouchableOpacity>
@@ -647,8 +705,8 @@ const DashboardScreen = ({ navigation }) => {
                             style={[styles.actionButton, isTablet && { flex: 0, width: (width - 80) / 3 }]}
                             onPress={() => navigation.navigate('Earnings')}
                         >
-                            <View style={[styles.actionIcon, { backgroundColor: `${COLORS.success}15` }]}>
-                                <Ionicons name="wallet" size={24} color={COLORS.success} />
+                            <View style={[styles.actionIcon, { backgroundColor: `${colors.success}15` }]}>
+                                <Ionicons name="wallet" size={24} color={colors.success} />
                             </View>
                             <Text style={styles.actionText}>Earnings</Text>
                         </TouchableOpacity>
@@ -657,8 +715,8 @@ const DashboardScreen = ({ navigation }) => {
                             style={[styles.actionButton, isTablet && { flex: 0, width: (width - 80) / 3 }]}
                             onPress={() => navigation.navigate('Profile')}
                         >
-                            <View style={[styles.actionIcon, { backgroundColor: `${COLORS.secondary}15` }]}>
-                                <Ionicons name="person" size={24} color={COLORS.secondary} />
+                            <View style={[styles.actionIcon, { backgroundColor: `${colors.secondary}15` }]}>
+                                <Ionicons name="person" size={24} color={colors.secondary} />
                             </View>
                             <Text style={styles.actionText}>My Profile</Text>
                         </TouchableOpacity>
@@ -679,16 +737,55 @@ const DashboardScreen = ({ navigation }) => {
 
                 <View style={{ height: 20 }} />
             </ScrollView>
+
+            {/* Goal Edit Modal */}
+            <Modal visible={showGoalModal} transparent animationType="slide">
+                <View style={styles.goalModalOverlay}>
+                    <View style={styles.goalModalCard}>
+                        <Text style={styles.goalModalTitle}>Set Daily Goals</Text>
+                        <Text style={styles.goalModalLabel}>Delivery Target</Text>
+                        <TextInput
+                            style={styles.goalModalInput}
+                            value={editDeliveryGoal}
+                            onChangeText={setEditDeliveryGoal}
+                            keyboardType="number-pad"
+                            placeholder="e.g. 5"
+                        />
+                        <Text style={styles.goalModalLabel}>Earnings Target (₵)</Text>
+                        <TextInput
+                            style={styles.goalModalInput}
+                            value={editEarningsGoal}
+                            onChangeText={setEditEarningsGoal}
+                            keyboardType="decimal-pad"
+                            placeholder="e.g. 80"
+                        />
+                        <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
+                            <TouchableOpacity
+                                style={[styles.goalModalBtn, { borderWidth: 1, borderColor: colors.border }]}
+                                onPress={() => setShowGoalModal(false)}
+                            >
+                                <Text style={{ color: colors.text, fontWeight: '600' }}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.goalModalBtn, { backgroundColor: colors.primary }]}
+                                onPress={saveGoals}
+                            >
+                                <Text style={{ color: '#fff', fontWeight: '600' }}>Save Goals</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
 
-const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: COLORS.background },
+const createStyles = (colors) => StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
     headerPremium: {
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.card,
         paddingHorizontal: 20,
         paddingTop: 10,
         paddingBottom: 20,
@@ -705,15 +802,45 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
     },
+    headerActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    notifBtn: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: colors.background,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    headerLogoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 8,
+    },
+    headerLogo: {
+        width: 28,
+        height: 28,
+        borderRadius: 6,
+    },
+    headerLogoName: {
+        fontSize: 15,
+        fontWeight: '800',
+        color: colors.text,
+        letterSpacing: 0.4,
+    },
     greetingHeader: {
         fontSize: 14,
-        color: COLORS.muted,
+        color: colors.muted,
         fontWeight: '500',
     },
     userNameHeader: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: COLORS.text,
+        color: colors.text,
     },
     statusToggleBtn: {
         flexDirection: 'row',
@@ -724,7 +851,7 @@ const styles = StyleSheet.create({
         gap: 6,
     },
     statusToggleText: {
-        color: COLORS.white,
+        color: colors.white,
         fontSize: 11,
         fontWeight: 'bold',
         letterSpacing: 0.5,
@@ -733,7 +860,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         marginTop: 15,
-        backgroundColor: `${COLORS.success}10`,
+        backgroundColor: `${colors.success}10`,
         alignSelf: 'flex-start',
         paddingHorizontal: 10,
         paddingVertical: 4,
@@ -744,17 +871,17 @@ const styles = StyleSheet.create({
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: COLORS.success,
+        backgroundColor: colors.success,
     },
     onlineInfoText: {
         fontSize: 12,
-        color: COLORS.success,
+        color: colors.success,
         fontWeight: '600',
     },
 
     // Daily Goals Card Styles
     goalCard: {
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.card,
         margin: 16,
         marginBottom: 8,
         borderRadius: 20,
@@ -779,12 +906,12 @@ const styles = StyleSheet.create({
     goalTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: COLORS.text,
+        color: colors.text,
     },
     streakBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFF3E8',
+        backgroundColor: `${colors.primary}15`,
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 20,
@@ -793,12 +920,12 @@ const styles = StyleSheet.create({
     streakText: {
         fontSize: 11,
         fontWeight: 'bold',
-        color: '#FF6B35',
+        color: colors.primary,
     },
     goalReachedBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: `${COLORS.success}15`,
+        backgroundColor: `${colors.success}15`,
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 20,
@@ -807,7 +934,7 @@ const styles = StyleSheet.create({
     goalReachedText: {
         fontSize: 11,
         fontWeight: 'bold',
-        color: COLORS.success,
+        color: colors.success,
     },
     progressSection: {
         marginBottom: 12,
@@ -821,16 +948,16 @@ const styles = StyleSheet.create({
     progressLabel: {
         fontSize: 13,
         fontWeight: '600',
-        color: COLORS.text,
+        color: colors.text,
     },
     progressValue: {
         fontSize: 13,
         fontWeight: 'bold',
-        color: COLORS.primary,
+        color: colors.primary,
     },
     progressBarBg: {
         height: 10,
-        backgroundColor: '#F1F5F9',
+        backgroundColor: colors.background,
         borderRadius: 5,
         overflow: 'hidden',
     },
@@ -840,7 +967,7 @@ const styles = StyleSheet.create({
     },
     motivationText: {
         fontSize: 13,
-        color: COLORS.muted,
+        color: colors.muted,
         textAlign: 'center',
         marginTop: 8,
         fontWeight: '500',
@@ -850,7 +977,7 @@ const styles = StyleSheet.create({
     quickNavButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         paddingHorizontal: 12,
         paddingVertical: 8,
         borderRadius: 20,
@@ -859,13 +986,13 @@ const styles = StyleSheet.create({
     quickNavText: {
         fontSize: 12,
         fontWeight: 'bold',
-        color: COLORS.white,
+        color: colors.white,
     },
 
     statCard: {
         flex: 1,
         minWidth: '45%',
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.card,
         borderRadius: 20,
         padding: 16,
         flexDirection: 'row',
@@ -890,16 +1017,16 @@ const styles = StyleSheet.create({
     statValue: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: COLORS.text,
+        color: colors.text,
     },
     statTitle: {
         fontSize: 10,
-        color: COLORS.muted,
+        color: colors.muted,
         textTransform: 'uppercase',
         letterSpacing: 0.5,
     },
     deliveryCardPremium: {
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.card,
         borderRadius: 20,
         padding: 16,
         marginBottom: 15,
@@ -909,7 +1036,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 10,
         borderWidth: 1,
-        borderColor: '#F1F5F9',
+        borderColor: colors.border,
     },
     deliveryHeaderPremium: {
         flexDirection: 'row',
@@ -923,14 +1050,14 @@ const styles = StyleSheet.create({
         borderRadius: 8,
     },
     statusTextPremium: {
-        color: COLORS.white,
+        color: colors.white,
         fontSize: 10,
         fontWeight: '900',
     },
     deliveryEarningPremium: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: COLORS.success,
+        color: colors.success,
     },
     deliveryPath: {
         flexDirection: 'row',
@@ -949,7 +1076,7 @@ const styles = StyleSheet.create({
     pathLine: {
         width: 2,
         flex: 1,
-        backgroundColor: '#F1F5F9',
+        backgroundColor: colors.background,
         marginVertical: 4,
     },
     pathText: {
@@ -957,7 +1084,7 @@ const styles = StyleSheet.create({
     },
     pathAddress: {
         fontSize: 13,
-        color: COLORS.text,
+        color: colors.text,
         fontWeight: '500',
     },
     deliveryFooterPremium: {
@@ -966,7 +1093,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingTop: 12,
         borderTopWidth: 1,
-        borderTopColor: '#F8FAFC',
+        borderTopColor: colors.border,
     },
     customerRow: {
         flexDirection: 'row',
@@ -976,10 +1103,10 @@ const styles = StyleSheet.create({
     },
     customerTextPremium: {
         fontSize: 13,
-        color: COLORS.muted,
+        color: colors.muted,
     },
     marketTagSmall: {
-        backgroundColor: `${COLORS.secondary}10`,
+        backgroundColor: `${colors.secondary}10`,
         paddingHorizontal: 8,
         paddingVertical: 3,
         borderRadius: 6,
@@ -989,28 +1116,58 @@ const styles = StyleSheet.create({
     },
     marketTagTextSmall: {
         fontSize: 10,
-        color: COLORS.secondary,
+        color: colors.secondary,
         fontWeight: 'bold',
     },
 
     content: { flex: 1 },
+    employeeBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: `${colors.primary}10`,
+        marginHorizontal: 16,
+        marginBottom: 8,
+        marginTop: 0,
+        padding: 10,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: `${colors.primary}20`,
+        gap: 6,
+    },
+    employeeBadgeText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: colors.primary,
+        flex: 1,
+    },
+    employeeVerifiedDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: colors.success,
+    },
+    employeeVerifiedText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: colors.success,
+    },
     verificationNotice: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: `${COLORS.warning}10`,
+        backgroundColor: `${colors.warning}10`,
         margin: 16,
         marginTop: 0,
         marginBottom: 8,
         padding: 16,
         borderRadius: 16,
         borderWidth: 1,
-        borderColor: `${COLORS.warning}20`,
+        borderColor: `${colors.warning}20`,
     },
     noticeIcon: {
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: `${COLORS.warning}20`,
+        backgroundColor: `${colors.warning}20`,
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
@@ -1021,11 +1178,11 @@ const styles = StyleSheet.create({
     noticeTitle: {
         fontSize: 15,
         fontWeight: 'bold',
-        color: COLORS.text,
+        color: colors.text,
     },
     noticeSubtitle: {
         fontSize: 12,
-        color: COLORS.muted,
+        color: colors.muted,
         marginTop: 2,
     },
     statsGrid: {
@@ -1048,36 +1205,38 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
     },
     sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-    sectionTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.text },
-    seeAll: { fontSize: 14, color: COLORS.primary },
+    sectionTitle: { fontSize: 18, fontWeight: 'bold', color: colors.text },
+    seeAll: { fontSize: 14, color: colors.primary },
 
     deliveryCard: {
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.card,
         borderRadius: 12,
         padding: 16,
         marginBottom: 10,
+        borderWidth: 1,
+        borderColor: colors.border,
     },
     deliveryHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
     statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-    statusText: { color: COLORS.white, fontSize: 10, fontWeight: 'bold' },
-    distanceBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: `${COLORS.muted}10`, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-    distanceBadgeText: { fontSize: 11, color: COLORS.muted, fontWeight: '500' },
-    deliveryEarning: { fontSize: 16, fontWeight: 'bold', color: COLORS.success },
+    statusText: { color: colors.white, fontSize: 10, fontWeight: 'bold' },
+    distanceBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: `${colors.muted}10`, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+    distanceBadgeText: { fontSize: 11, color: colors.muted, fontWeight: '500' },
+    deliveryEarning: { fontSize: 16, fontWeight: 'bold', color: colors.success },
     deliveryBody: { gap: 6 },
     addressRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    addressText: { flex: 1, fontSize: 14, color: COLORS.text },
-    contactText: { fontSize: 13, color: COLORS.muted },
-    cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: COLORS.border },
+    addressText: { flex: 1, fontSize: 14, color: colors.text },
+    contactText: { fontSize: 13, color: colors.muted },
+    cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border },
     codBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    codText: { fontSize: 13, fontWeight: '600', color: COLORS.warning },
-    marketplaceBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: `${COLORS.secondary}15`, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-    marketplaceBadgeText: { fontSize: 11, color: COLORS.secondary, fontWeight: '600' },
+    codText: { fontSize: 13, fontWeight: '600', color: colors.warning },
+    marketplaceBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: `${colors.secondary}15`, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+    marketplaceBadgeText: { fontSize: 11, color: colors.secondary, fontWeight: '600' },
 
-    emptyState: { alignItems: 'center', padding: 30, backgroundColor: COLORS.white, borderRadius: 12 },
-    emptyText: { fontSize: 14, color: COLORS.muted, marginTop: 12 },
-    findButton: { marginTop: 16, backgroundColor: COLORS.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
-    findButtonText: { color: COLORS.white, fontWeight: '600' },
+    emptyState: { alignItems: 'center', padding: 30, backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.border },
+    emptyText: { fontSize: 14, color: colors.muted, marginTop: 12 },
+    findButton: { marginTop: 16, backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
+    findButtonText: { color: colors.white, fontWeight: '600' },
 
     actionsGrid: {
         flexDirection: 'row',
@@ -1089,7 +1248,7 @@ const styles = StyleSheet.create({
     },
     actionButton: {
         flex: 1,
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.card,
         borderRadius: 12,
         padding: 16,
         alignItems: 'center',
@@ -1098,40 +1257,42 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
         shadowRadius: 5,
+        borderWidth: 1,
+        borderColor: colors.border,
     },
     actionIcon: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
-    actionText: { fontSize: 12, color: COLORS.text, fontWeight: '500' },
+    actionText: { fontSize: 12, color: colors.text, fontWeight: '500' },
 
     earningsCard: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         borderRadius: 20,
         padding: 24,
         margin: 15,
         marginTop: 10,
         elevation: 4,
-        shadowColor: COLORS.primary,
+        shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 8,
     },
-    earningsLabel: { fontSize: 12, color: COLORS.white, opacity: 0.8 },
-    earningsAmount: { fontSize: 28, fontWeight: 'bold', color: COLORS.white },
+    earningsLabel: { fontSize: 12, color: colors.white, opacity: 0.8 },
+    earningsAmount: { fontSize: 28, fontWeight: 'bold', color: colors.white },
     successRate: { alignItems: 'flex-end' },
-    successLabel: { fontSize: 12, color: COLORS.white, opacity: 0.8 },
-    successValue: { fontSize: 24, fontWeight: 'bold', color: COLORS.white },
+    successLabel: { fontSize: 12, color: colors.white, opacity: 0.8 },
+    successValue: { fontSize: 24, fontWeight: 'bold', color: colors.white },
 
     // Wallet Card Styles
     walletCard: {
-        backgroundColor: '#10B981',
+        backgroundColor: colors.success,
         borderRadius: 20,
         padding: 20,
         marginHorizontal: 16,
         marginBottom: 16,
         elevation: 6,
-        shadowColor: '#10B981',
+        shadowColor: colors.success,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 10,
@@ -1160,12 +1321,12 @@ const styles = StyleSheet.create({
     walletAmount: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: COLORS.white,
+        color: colors.white,
     },
     cashWarning: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FEE2E2',
+        backgroundColor: `${colors.error}20`,
         padding: 10,
         borderRadius: 10,
         marginTop: 14,
@@ -1173,7 +1334,7 @@ const styles = StyleSheet.create({
     },
     cashWarningText: {
         fontSize: 13,
-        color: '#DC2626',
+        color: colors.error,
         fontWeight: '600',
     },
     walletStats: {
@@ -1199,17 +1360,17 @@ const styles = StyleSheet.create({
     walletStatValue: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: COLORS.white,
+        color: colors.white,
         marginTop: 4,
     },
     routePlanningCard: {
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.card,
         borderRadius: 16,
         padding: 16,
         marginHorizontal: 16,
         marginBottom: 16,
         borderWidth: 1,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
         elevation: 3,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
@@ -1224,7 +1385,7 @@ const styles = StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -1235,12 +1396,57 @@ const styles = StyleSheet.create({
     routePlanningTitle: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: COLORS.text,
+        color: colors.text,
     },
     routePlanningSubtitle: {
         fontSize: 12,
-        color: COLORS.muted,
+        color: colors.muted,
         marginTop: 2,
+    },
+    editGoalBtn: {
+        padding: 6,
+        borderRadius: 20,
+        backgroundColor: colors.background,
+    },
+    goalModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        justifyContent: 'flex-end',
+    },
+    goalModalCard: {
+        backgroundColor: colors.card,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        padding: 24,
+    },
+    goalModalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: colors.text,
+        marginBottom: 20,
+        textAlign: 'center',
+    },
+    goalModalLabel: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: colors.text,
+        marginBottom: 6,
+    },
+    goalModalInput: {
+        backgroundColor: colors.background,
+        borderRadius: 12,
+        padding: 14,
+        fontSize: 15,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: colors.border,
+        color: colors.text,
+    },
+    goalModalBtn: {
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: 12,
+        alignItems: 'center',
     },
 });
 

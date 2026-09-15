@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
     View,
     Text,
@@ -13,10 +13,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE, PROVIDER_DEFAULT } from '../components/Map';
+
+const MAP_PROVIDER = Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT;
 import * as Location from 'expo-location';
-import { COLORS } from '../theme/colors';
 import courierApi from '../services/courierApi';
+import { useTheme } from '../theme/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 const ASPECT_RATIO = width / height;
@@ -24,6 +26,9 @@ const LATITUDE_DELTA = 0.05;
 const LONGITUDE_DELTA = LATITUDE_DELTA * ASPECT_RATIO;
 
 const RoutePlanningScreen = ({ navigation }) => {
+    const theme_hook = useTheme();
+    const colors = theme_hook?.colors ?? {};
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const mapRef = useRef(null);
     const [loading, setLoading] = useState(true);
     const [deliveries, setDeliveries] = useState([]);
@@ -268,7 +273,7 @@ const RoutePlanningScreen = ({ navigation }) => {
             >
                 <View style={[
                     styles.stopNumber,
-                    { backgroundColor: isPickup ? COLORS.success : COLORS.primary }
+                    { backgroundColor: isPickup ? colors.success : colors.primary }
                 ]}>
                     <Text style={styles.stopNumberText}>{index + 1}</Text>
                 </View>
@@ -276,16 +281,16 @@ const RoutePlanningScreen = ({ navigation }) => {
                     <View style={styles.stopTypeRow}>
                         <View style={[
                             styles.stopTypeBadge,
-                            { backgroundColor: isPickup ? `${COLORS.success}15` : `${COLORS.primary}15` }
+                            { backgroundColor: isPickup ? `${colors.success}15` : `${colors.primary}15` }
                         ]}>
                             <Ionicons
                                 name={isPickup ? 'cube' : 'location'}
                                 size={12}
-                                color={isPickup ? COLORS.success : COLORS.primary}
+                                color={isPickup ? colors.success : colors.primary}
                             />
                             <Text style={[
                                 styles.stopTypeText,
-                                { color: isPickup ? COLORS.success : COLORS.primary }
+                                { color: isPickup ? colors.success : colors.primary }
                             ]}>
                                 {isPickup ? 'PICKUP' : 'DELIVERY'}
                             </Text>
@@ -299,7 +304,7 @@ const RoutePlanningScreen = ({ navigation }) => {
                     style={styles.navigateButton}
                     onPress={() => openNavigation(stop)}
                 >
-                    <Ionicons name="navigate" size={20} color={COLORS.white} />
+                    <Ionicons name="navigate" size={20} color={colors.white} />
                 </TouchableOpacity>
             </TouchableOpacity>
         );
@@ -309,7 +314,7 @@ const RoutePlanningScreen = ({ navigation }) => {
         return (
             <SafeAreaView style={styles.container} edges={['top']}>
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={COLORS.primary} />
+                    <ActivityIndicator size="large" color={colors.primary} />
                     <Text style={styles.loadingText}>Planning your route...</Text>
                 </View>
             </SafeAreaView>
@@ -321,7 +326,7 @@ const RoutePlanningScreen = ({ navigation }) => {
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+                    <Ionicons name="arrow-back" size={24} color={colors.white} />
                 </TouchableOpacity>
                 <View style={styles.headerCenter}>
                     <Text style={styles.headerTitle}>Route Planning</Text>
@@ -330,7 +335,7 @@ const RoutePlanningScreen = ({ navigation }) => {
                     </Text>
                 </View>
                 <TouchableOpacity onPress={initializeRoute} style={styles.refreshButton}>
-                    <Ionicons name="refresh" size={22} color={COLORS.white} />
+                    <Ionicons name="refresh" size={22} color={colors.white} />
                 </TouchableOpacity>
             </View>
 
@@ -339,7 +344,7 @@ const RoutePlanningScreen = ({ navigation }) => {
                 <MapView
                     ref={mapRef}
                     style={styles.map}
-                    provider={PROVIDER_GOOGLE}
+                    provider={MAP_PROVIDER}
                     initialRegion={currentLocation ? {
                         ...currentLocation,
                         latitudeDelta: LATITUDE_DELTA,
@@ -357,7 +362,7 @@ const RoutePlanningScreen = ({ navigation }) => {
                     {routeCoordinates.length > 1 && (
                         <Polyline
                             coordinates={routeCoordinates}
-                            strokeColor={COLORS.primary}
+                            strokeColor={colors.primary}
                             strokeWidth={4}
                             lineDashPattern={[1]}
                         />
@@ -375,7 +380,7 @@ const RoutePlanningScreen = ({ navigation }) => {
                         >
                             <View style={[
                                 styles.markerContainer,
-                                { backgroundColor: stop.stopType === 'pickup' ? COLORS.success : COLORS.primary }
+                                { backgroundColor: stop.stopType === 'pickup' ? colors.success : colors.primary }
                             ]}>
                                 <Text style={styles.markerText}>{index + 1}</Text>
                             </View>
@@ -386,26 +391,26 @@ const RoutePlanningScreen = ({ navigation }) => {
                 {/* Map controls */}
                 <View style={styles.mapControls}>
                     <TouchableOpacity style={styles.mapControlButton} onPress={recenterMap}>
-                        <Ionicons name="locate" size={22} color={COLORS.primary} />
+                        <Ionicons name="locate" size={22} color={colors.primary} />
                     </TouchableOpacity>
                 </View>
 
                 {/* Route summary overlay */}
                 <View style={styles.routeSummary}>
                     <View style={styles.summaryItem}>
-                        <Ionicons name="flag" size={18} color={COLORS.primary} />
+                        <Ionicons name="flag" size={18} color={colors.primary} />
                         <Text style={styles.summaryValue}>{deliveries.length}</Text>
                         <Text style={styles.summaryLabel}>Stops</Text>
                     </View>
                     <View style={styles.summaryDivider} />
                     <View style={styles.summaryItem}>
-                        <Ionicons name="navigate" size={18} color={COLORS.success} />
+                        <Ionicons name="navigate" size={18} color={colors.success} />
                         <Text style={styles.summaryValue}>{totalDistance.toFixed(1)}</Text>
                         <Text style={styles.summaryLabel}>km</Text>
                     </View>
                     <View style={styles.summaryDivider} />
                     <View style={styles.summaryItem}>
-                        <Ionicons name="time" size={18} color={COLORS.warning} />
+                        <Ionicons name="time" size={18} color={colors.warning} />
                         <Text style={styles.summaryValue}>{totalTime}</Text>
                         <Text style={styles.summaryLabel}>min</Text>
                     </View>
@@ -417,14 +422,14 @@ const RoutePlanningScreen = ({ navigation }) => {
                 <View style={styles.stopsHeader}>
                     <Text style={styles.stopsTitle}>Your Route</Text>
                     <TouchableOpacity style={styles.startRouteButton} onPress={navigateFullRoute}>
-                        <Ionicons name="navigate" size={16} color={COLORS.white} />
+                        <Ionicons name="navigate" size={16} color={colors.white} />
                         <Text style={styles.startRouteText}>Start Navigation</Text>
                     </TouchableOpacity>
                 </View>
 
                 {deliveries.length === 0 ? (
                     <View style={styles.emptyState}>
-                        <Ionicons name="map-outline" size={48} color={COLORS.muted} />
+                        <Ionicons name="map-outline" size={48} color={colors.muted} />
                         <Text style={styles.emptyText}>No active deliveries</Text>
                         <Text style={styles.emptySubtext}>Accept some deliveries to plan your route</Text>
                     </View>
@@ -460,10 +465,10 @@ const RoutePlanningScreen = ({ navigation }) => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
     },
     loadingContainer: {
         flex: 1,
@@ -473,14 +478,14 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 16,
         fontSize: 16,
-        color: COLORS.muted,
+        color: colors.muted,
     },
 
     // Header
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         paddingHorizontal: 16,
         paddingVertical: 12,
     },
@@ -499,7 +504,7 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: COLORS.white,
+        color: colors.white,
     },
     headerSubtitle: {
         fontSize: 12,
@@ -532,7 +537,7 @@ const styles = StyleSheet.create({
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         justifyContent: 'center',
         alignItems: 'center',
         elevation: 4,
@@ -549,7 +554,7 @@ const styles = StyleSheet.create({
         left: 16,
         right: 16,
         flexDirection: 'row',
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderRadius: 16,
         padding: 12,
         elevation: 4,
@@ -568,15 +573,15 @@ const styles = StyleSheet.create({
     summaryValue: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: COLORS.text,
+        color: colors.text,
     },
     summaryLabel: {
         fontSize: 12,
-        color: COLORS.muted,
+        color: colors.muted,
     },
     summaryDivider: {
         width: 1,
-        backgroundColor: COLORS.border,
+        backgroundColor: colors.border,
     },
 
     // Markers
@@ -587,10 +592,10 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 3,
-        borderColor: COLORS.white,
+        borderColor: colors.white,
     },
     markerText: {
-        color: COLORS.white,
+        color: colors.white,
         fontSize: 14,
         fontWeight: 'bold',
     },
@@ -598,7 +603,7 @@ const styles = StyleSheet.create({
     // Stops list
     stopsContainer: {
         flex: 1,
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
         marginTop: -16,
@@ -614,12 +619,12 @@ const styles = StyleSheet.create({
     stopsTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: COLORS.text,
+        color: colors.text,
     },
     startRouteButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         paddingHorizontal: 14,
         paddingVertical: 8,
         borderRadius: 20,
@@ -628,7 +633,7 @@ const styles = StyleSheet.create({
     startRouteText: {
         fontSize: 13,
         fontWeight: '600',
-        color: COLORS.white,
+        color: colors.white,
     },
     stopsList: {
         flex: 1,
@@ -639,7 +644,7 @@ const styles = StyleSheet.create({
     stopCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
         borderRadius: 16,
         padding: 14,
         marginBottom: 10,
@@ -647,11 +652,11 @@ const styles = StyleSheet.create({
         borderColor: 'transparent',
     },
     stopCardSelected: {
-        borderColor: COLORS.primary,
-        backgroundColor: `${COLORS.primary}08`,
+        borderColor: colors.primary,
+        backgroundColor: `${colors.primary}08`,
     },
     stopCardPickup: {
-        backgroundColor: `${COLORS.success}08`,
+        backgroundColor: `${colors.success}08`,
     },
     stopNumber: {
         width: 36,
@@ -662,7 +667,7 @@ const styles = StyleSheet.create({
         marginRight: 12,
     },
     stopNumberText: {
-        color: COLORS.white,
+        color: colors.white,
         fontSize: 16,
         fontWeight: 'bold',
     },
@@ -691,24 +696,24 @@ const styles = StyleSheet.create({
     stopEarning: {
         fontSize: 14,
         fontWeight: 'bold',
-        color: COLORS.success,
+        color: colors.success,
     },
     stopName: {
         fontSize: 15,
         fontWeight: '600',
-        color: COLORS.text,
+        color: colors.text,
         marginBottom: 2,
     },
     stopAddress: {
         fontSize: 12,
-        color: COLORS.muted,
+        color: colors.muted,
         lineHeight: 16,
     },
     navigateButton: {
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         justifyContent: 'center',
         alignItems: 'center',
         marginLeft: 10,
@@ -724,12 +729,12 @@ const styles = StyleSheet.create({
     emptyText: {
         fontSize: 16,
         fontWeight: '600',
-        color: COLORS.text,
+        color: colors.text,
         marginTop: 16,
     },
     emptySubtext: {
         fontSize: 14,
-        color: COLORS.muted,
+        color: colors.muted,
         marginTop: 4,
         textAlign: 'center',
     },

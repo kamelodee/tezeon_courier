@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     View,
     Text,
@@ -11,10 +11,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../theme/colors';
 import courierApi from '../services/courierApi';
+import { useTheme } from '../theme/ThemeContext';
 
 const SupportTicketScreen = ({ navigation, route }) => {
+    const theme_hook = useTheme();
+    const colors = theme_hook?.colors ?? {};
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const { deliveryId, reason = '' } = route.params || {};
     const [loading, setLoading] = useState(false);
     const [issueType, setIssueType] = useState(reason || 'general');
@@ -63,7 +66,7 @@ const SupportTicketScreen = ({ navigation, route }) => {
         <SafeAreaView style={styles.container} edges={['top']}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+                    <Ionicons name="arrow-back" size={24} color={colors.white} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Report an Issue</Text>
                 <View style={{ width: 40 }} />
@@ -88,7 +91,7 @@ const SupportTicketScreen = ({ navigation, route }) => {
                                 <Ionicons
                                     name={type.icon}
                                     size={24}
-                                    color={issueType === type.id ? COLORS.white : COLORS.primary}
+                                    color={issueType === type.id ? colors.white : colors.primary}
                                 />
                             </View>
                             <Text style={[
@@ -113,7 +116,7 @@ const SupportTicketScreen = ({ navigation, route }) => {
                 />
 
                 <View style={styles.infoBox}>
-                    <Ionicons name="shield-checkmark" size={20} color={COLORS.success} />
+                    <Ionicons name="shield-checkmark" size={20} color={colors.success} />
                     <Text style={styles.infoText}>
                         Raising a ticket for a delivery helps us protect your rating and resolve disputes faster.
                     </Text>
@@ -125,7 +128,7 @@ const SupportTicketScreen = ({ navigation, route }) => {
                     disabled={loading}
                 >
                     {loading ? (
-                        <ActivityIndicator color={COLORS.white} />
+                        <ActivityIndicator color={colors.white} />
                     ) : (
                         <Text style={styles.submitButtonText}>Submit Report</Text>
                     )}
@@ -135,10 +138,10 @@ const SupportTicketScreen = ({ navigation, route }) => {
     );
 };
 
-const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: COLORS.background },
+const createStyles = (colors) => StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
     header: {
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         padding: 16,
         paddingTop: 14,
         flexDirection: 'row',
@@ -153,15 +156,15 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    headerTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.white },
+    headerTitle: { fontSize: 18, fontWeight: 'bold', color: colors.white },
 
     content: { padding: 20 },
-    sectionTitle: { fontSize: 11, fontWeight: '700', color: COLORS.muted, marginBottom: 16, letterSpacing: 1 },
+    sectionTitle: { fontSize: 11, fontWeight: '700', color: colors.muted, marginBottom: 16, letterSpacing: 1 },
 
     typesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 24 },
     typeCard: {
         width: '48%',
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderRadius: 16,
         padding: 16,
         alignItems: 'center',
@@ -173,57 +176,57 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 5,
     },
-    typeCardSelected: { borderColor: COLORS.primary, backgroundColor: `${COLORS.primary}05` },
+    typeCardSelected: { borderColor: colors.primary, backgroundColor: `${colors.primary}05` },
     iconContainer: {
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: `${COLORS.primary}15`,
+        backgroundColor: `${colors.primary}15`,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 8,
     },
-    iconContainerSelected: { backgroundColor: COLORS.primary },
-    typeLabel: { fontSize: 13, fontWeight: '600', color: COLORS.text, textAlign: 'center' },
-    typeLabelSelected: { color: COLORS.primary },
+    iconContainerSelected: { backgroundColor: colors.primary },
+    typeLabel: { fontSize: 13, fontWeight: '600', color: colors.text, textAlign: 'center' },
+    typeLabelSelected: { color: colors.primary },
 
     textArea: {
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderRadius: 16,
         padding: 16,
         fontSize: 15,
-        color: COLORS.text,
+        color: colors.text,
         borderWidth: 1,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
         marginBottom: 20,
         minHeight: 120,
     },
 
     infoBox: {
         flexDirection: 'row',
-        backgroundColor: `${COLORS.success}10`,
+        backgroundColor: `${colors.success}10`,
         padding: 16,
         borderRadius: 12,
         gap: 12,
         alignItems: 'center',
         marginBottom: 30,
     },
-    infoText: { flex: 1, fontSize: 13, color: COLORS.success, lineHeight: 18 },
+    infoText: { flex: 1, fontSize: 13, color: colors.success, lineHeight: 18 },
 
     submitButton: {
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         height: 56,
         borderRadius: 16,
         justifyContent: 'center',
         alignItems: 'center',
         elevation: 4,
-        shadowColor: COLORS.primary,
+        shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
     },
     buttonDisabled: { opacity: 0.6 },
-    submitButtonText: { color: COLORS.white, fontSize: 16, fontWeight: 'bold' },
+    submitButtonText: { color: colors.white, fontSize: 16, fontWeight: 'bold' },
 });
 
 export default SupportTicketScreen;

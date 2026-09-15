@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     View,
     Text,
@@ -13,10 +13,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../theme/colors';
 import courierApi from '../services/courierApi';
+import { useTheme } from '../theme/ThemeContext';
 
 const RegisterScreen = ({ navigation }) => {
+    const theme_hook = useTheme();
+    const colors = theme_hook?.colors ?? {};
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
     const [email, setEmail] = useState('');
@@ -112,7 +115,7 @@ const RegisterScreen = ({ navigation }) => {
             <Ionicons
                 name={icon}
                 size={24}
-                color={vehicleType === type ? COLORS.white : COLORS.primary}
+                color={vehicleType === type ? colors.white : colors.primary}
             />
             <Text style={[
                 styles.vehicleLabel,
@@ -132,7 +135,7 @@ const RegisterScreen = ({ navigation }) => {
                         style={styles.backButton}
                         onPress={() => navigation.goBack()}
                     >
-                        <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+                        <Ionicons name="arrow-back" size={24} color={colors.text} />
                     </TouchableOpacity>
 
                     <Text style={styles.title}>Create Account</Text>
@@ -159,7 +162,7 @@ const RegisterScreen = ({ navigation }) => {
                         </View>
 
                         <View style={styles.inputContainer}>
-                            <Ionicons name="mail-outline" size={20} color={COLORS.muted} style={styles.inputIcon} />
+                            <Ionicons name="mail-outline" size={20} color={colors.muted} style={styles.inputIcon} />
                             <TextInput
                                 style={styles.input}
                                 placeholder="Email address"
@@ -171,7 +174,7 @@ const RegisterScreen = ({ navigation }) => {
                         </View>
 
                         <View style={styles.inputContainer}>
-                            <Ionicons name="call-outline" size={20} color={COLORS.muted} style={styles.inputIcon} />
+                            <Ionicons name="call-outline" size={20} color={colors.muted} style={styles.inputIcon} />
                             <TextInput
                                 style={styles.input}
                                 placeholder="Phone number"
@@ -182,7 +185,7 @@ const RegisterScreen = ({ navigation }) => {
                         </View>
 
                         <View style={styles.inputContainer}>
-                            <Ionicons name="lock-closed-outline" size={20} color={COLORS.muted} style={styles.inputIcon} />
+                            <Ionicons name="lock-closed-outline" size={20} color={colors.muted} style={styles.inputIcon} />
                             <TextInput
                                 style={styles.input}
                                 placeholder="Password"
@@ -194,13 +197,13 @@ const RegisterScreen = ({ navigation }) => {
                                 <Ionicons
                                     name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                                     size={20}
-                                    color={COLORS.muted}
+                                    color={colors.muted}
                                 />
                             </TouchableOpacity>
                         </View>
 
                         <View style={styles.inputContainer}>
-                            <Ionicons name="lock-closed-outline" size={20} color={COLORS.muted} style={styles.inputIcon} />
+                            <Ionicons name="lock-closed-outline" size={20} color={colors.muted} style={styles.inputIcon} />
                             <TextInput
                                 style={styles.input}
                                 placeholder="Confirm Password"
@@ -219,7 +222,7 @@ const RegisterScreen = ({ navigation }) => {
                         </ScrollView>
 
                         <View style={styles.inputContainer}>
-                            <Ionicons name="information-circle-outline" size={20} color={COLORS.muted} style={styles.inputIcon} />
+                            <Ionicons name="information-circle-outline" size={20} color={colors.muted} style={styles.inputIcon} />
                             <TextInput
                                 style={styles.input}
                                 placeholder="Vehicle Number Plate (Optional)"
@@ -254,10 +257,10 @@ const RegisterScreen = ({ navigation }) => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
     },
     scrollContent: {
         flexGrow: 1,
@@ -269,12 +272,12 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: COLORS.text,
+        color: colors.text,
         marginBottom: 8,
     },
     subtitle: {
         fontSize: 16,
-        color: COLORS.muted,
+        color: colors.muted,
         marginBottom: 32,
     },
     form: {
@@ -287,12 +290,12 @@ const styles = StyleSheet.create({
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
         borderRadius: 12,
         paddingHorizontal: 16,
         marginBottom: 16,
         borderWidth: 1,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
     },
     inputIcon: {
         marginRight: 12,
@@ -301,12 +304,12 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingVertical: 16,
         fontSize: 16,
-        color: COLORS.text,
+        color: colors.text,
     },
     sectionTitle: {
         fontSize: 16,
         fontWeight: '600',
-        color: COLORS.text,
+        color: colors.text,
         marginTop: 8,
         marginBottom: 16,
     },
@@ -317,30 +320,30 @@ const styles = StyleSheet.create({
     vehicleOption: {
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
         borderRadius: 12,
         padding: 16,
         marginRight: 12,
         width: 100,
         borderWidth: 1,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
     },
     vehicleOptionSelected: {
-        backgroundColor: COLORS.primary,
-        borderColor: COLORS.primary,
+        backgroundColor: colors.primary,
+        borderColor: colors.primary,
     },
     vehicleLabel: {
         marginTop: 8,
         fontSize: 12,
-        color: COLORS.text,
+        color: colors.text,
         textAlign: 'center',
     },
     vehicleLabelSelected: {
-        color: COLORS.white,
+        color: colors.white,
         fontWeight: '600',
     },
     registerButton: {
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         paddingVertical: 16,
         borderRadius: 12,
         alignItems: 'center',
@@ -350,7 +353,7 @@ const styles = StyleSheet.create({
         opacity: 0.7,
     },
     buttonText: {
-        color: COLORS.white,
+        color: colors.white,
         fontSize: 16,
         fontWeight: '600',
     },
@@ -361,11 +364,11 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
     },
     footerText: {
-        color: COLORS.muted,
+        color: colors.muted,
         fontSize: 14,
     },
     loginLink: {
-        color: COLORS.primary,
+        color: colors.primary,
         fontSize: 14,
         fontWeight: '600',
     },

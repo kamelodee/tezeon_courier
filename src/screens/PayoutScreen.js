@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     View,
     Text,
@@ -14,10 +14,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../theme/colors';
 import courierApi from '../services/courierApi';
+import { useTheme } from '../theme/ThemeContext';
 
 const PayoutScreen = ({ navigation, route }) => {
+    const theme_hook = useTheme();
+    const colors = theme_hook?.colors ?? {};
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const { balance = 0 } = route.params || {};
     const [loading, setLoading] = useState(false);
     const [amount, setAmount] = useState('');
@@ -71,8 +74,9 @@ const PayoutScreen = ({ navigation, route }) => {
             return;
         }
 
-        if (!momoNumber || momoNumber.length < 10) {
-            Alert.alert('Error', 'Please enter a valid Mobile Money number');
+        const digits = momoNumber.replace(/\D/g, '');
+        if (!digits || digits.length < 9 || digits.length > 12) {
+            Alert.alert('Error', 'Please enter a valid Mobile Money number (9-12 digits)');
             return;
         }
 
@@ -123,7 +127,7 @@ const PayoutScreen = ({ navigation, route }) => {
         >
             <View style={[
                 styles.networkIcon,
-                { backgroundColor: name === 'MTN' ? '#FFCC00' : name === 'Telecel' ? '#E60000' : '#00AEEF' }
+                { backgroundColor: name === 'MTN' ? '#FFCC00' : name === 'Telecel' ? '#E60000' : '#003087' }
             ]}>
                 <Text style={styles.networkLetter}>{name.charAt(0)}</Text>
             </View>
@@ -135,7 +139,7 @@ const PayoutScreen = ({ navigation, route }) => {
         <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+                    <Ionicons name="arrow-back" size={24} color={colors.white} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Cash Out</Text>
                 <View style={{ width: 40 }} />
@@ -162,7 +166,7 @@ const PayoutScreen = ({ navigation, route }) => {
                                 value={amount}
                                 onChangeText={setAmount}
                                 keyboardType="decimal-pad"
-                                placeholderTextColor={COLORS.muted}
+                                placeholderTextColor={colors.muted}
                             />
                             <TouchableOpacity
                                 style={styles.maxButton}
@@ -179,13 +183,13 @@ const PayoutScreen = ({ navigation, route }) => {
                         <View style={styles.networksRow}>
                             <NetworkOption name="MTN" />
                             <NetworkOption name="Telecel" />
-                            <NetworkOption name="AT" />
+                            <NetworkOption name="AirtelTigo" />
                         </View>
 
                         <View style={styles.inputGroup}>
                             <Text style={styles.inputLabel}>MoMo Number</Text>
                             <View style={styles.inputContainer}>
-                                <Ionicons name="call" size={20} color={COLORS.muted} style={styles.inputIcon} />
+                                <Ionicons name="call" size={20} color={colors.muted} style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
                                     placeholder="024 000 0000"
@@ -199,7 +203,7 @@ const PayoutScreen = ({ navigation, route }) => {
                         <View style={styles.inputGroup}>
                             <Text style={styles.inputLabel}>Account Name (Optional)</Text>
                             <View style={styles.inputContainer}>
-                                <Ionicons name="person" size={20} color={COLORS.muted} style={styles.inputIcon} />
+                                <Ionicons name="person" size={20} color={colors.muted} style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
                                     placeholder="Account Holder Name"
@@ -211,7 +215,7 @@ const PayoutScreen = ({ navigation, route }) => {
                     </View>
 
                     <View style={styles.infoBox}>
-                        <Ionicons name="information-circle" size={20} color={COLORS.primary} />
+                        <Ionicons name="information-circle" size={20} color={colors.primary} />
                         <Text style={styles.infoText}>
                             Payouts are processed daily. Please ensure your MoMo details are correct to avoid delays.
                         </Text>
@@ -226,10 +230,10 @@ const PayoutScreen = ({ navigation, route }) => {
                     disabled={loading || !amount}
                 >
                     {loading ? (
-                        <ActivityIndicator color={COLORS.white} />
+                        <ActivityIndicator color={colors.white} />
                     ) : (
                         <>
-                            <Ionicons name="wallet-outline" size={22} color={COLORS.white} />
+                            <Ionicons name="wallet-outline" size={22} color={colors.white} />
                             <Text style={styles.payoutButtonText}>Request Withdrawal</Text>
                         </>
                     )}
@@ -239,10 +243,10 @@ const PayoutScreen = ({ navigation, route }) => {
     );
 };
 
-const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: COLORS.background },
+const createStyles = (colors) => StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
     header: {
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         padding: 16,
         paddingTop: 14,
         flexDirection: 'row',
@@ -257,12 +261,12 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    headerTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.white },
+    headerTitle: { fontSize: 18, fontWeight: 'bold', color: colors.white },
 
     content: { padding: 20 },
 
     balanceCard: {
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderRadius: 20,
         padding: 24,
         alignItems: 'center',
@@ -273,81 +277,81 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 10,
     },
-    balanceLabel: { fontSize: 13, color: COLORS.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
-    balanceAmount: { fontSize: 36, fontWeight: 'bold', color: COLORS.text, marginTop: 8 },
+    balanceLabel: { fontSize: 13, color: colors.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
+    balanceAmount: { fontSize: 36, fontWeight: 'bold', color: colors.text, marginTop: 8 },
 
     section: { marginBottom: 24 },
-    sectionTitle: { fontSize: 11, fontWeight: '700', color: COLORS.muted, marginBottom: 16, letterSpacing: 1 },
+    sectionTitle: { fontSize: 11, fontWeight: '700', color: colors.muted, marginBottom: 16, letterSpacing: 1 },
 
     amountInputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderRadius: 16,
         paddingHorizontal: 16,
         height: 70,
         borderWidth: 2,
-        borderColor: COLORS.primaryLight,
+        borderColor: colors.primaryLight,
     },
-    currencyPrefix: { fontSize: 24, fontWeight: 'bold', color: COLORS.text, marginRight: 10 },
-    amountInput: { flex: 1, fontSize: 32, fontWeight: 'bold', color: COLORS.text },
+    currencyPrefix: { fontSize: 24, fontWeight: 'bold', color: colors.text, marginRight: 10 },
+    amountInput: { flex: 1, fontSize: 32, fontWeight: 'bold', color: colors.text },
     maxButton: {
-        backgroundColor: `${COLORS.primary}15`,
+        backgroundColor: `${colors.primary}15`,
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 8,
     },
-    maxButtonText: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
+    maxButtonText: { fontSize: 12, fontWeight: '700', color: colors.primary },
 
     networksRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
     networkOption: {
         flex: 1,
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderRadius: 12,
         padding: 12,
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
     },
-    networkOptionSelected: { borderColor: COLORS.primary, backgroundColor: `${COLORS.primary}05` },
+    networkOptionSelected: { borderColor: colors.primary, backgroundColor: `${colors.primary}05` },
     networkIcon: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
-    networkLetter: { color: COLORS.white, fontWeight: 'bold', fontSize: 18 },
-    networkName: { fontSize: 11, fontWeight: '600', color: COLORS.muted },
-    networkNameActive: { color: COLORS.primary },
+    networkLetter: { color: colors.white, fontWeight: 'bold', fontSize: 18 },
+    networkName: { fontSize: 11, fontWeight: '600', color: colors.muted },
+    networkNameActive: { color: colors.primary },
 
     inputGroup: { marginBottom: 16 },
-    inputLabel: { fontSize: 14, fontWeight: '600', color: COLORS.text, marginBottom: 8 },
+    inputLabel: { fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 8 },
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderRadius: 12,
         paddingHorizontal: 14,
         height: 54,
         borderWidth: 1,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
     },
     inputIcon: { marginRight: 10 },
-    input: { flex: 1, fontSize: 16, color: COLORS.text },
+    input: { flex: 1, fontSize: 16, color: colors.text },
 
     infoBox: {
         flexDirection: 'row',
-        backgroundColor: `${COLORS.primary}10`,
+        backgroundColor: `${colors.primary}10`,
         padding: 16,
         borderRadius: 12,
         gap: 12,
         alignItems: 'flex-start',
     },
-    infoText: { flex: 1, fontSize: 13, color: COLORS.primary, lineHeight: 18 },
+    infoText: { flex: 1, fontSize: 13, color: colors.primary, lineHeight: 18 },
 
     footer: {
         padding: 20,
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderTopWidth: 1,
-        borderTopColor: COLORS.border,
+        borderTopColor: colors.border,
     },
     payoutButton: {
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         height: 56,
         borderRadius: 16,
         flexDirection: 'row',
@@ -355,13 +359,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 10,
         elevation: 4,
-        shadowColor: COLORS.primary,
+        shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
     },
     buttonDisabled: { opacity: 0.6 },
-    payoutButtonText: { color: COLORS.white, fontSize: 16, fontWeight: 'bold' },
+    payoutButtonText: { color: colors.white, fontSize: 16, fontWeight: 'bold' },
 });
 
 export default PayoutScreen;

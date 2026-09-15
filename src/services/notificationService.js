@@ -151,10 +151,10 @@ class NotificationService {
      */
     async saveTokenToBackend(token) {
         try {
-            // This would call your backend API to save the push token
-            // await courierApi.updatePushToken(token);
             await AsyncStorage.setItem('expoPushToken', token);
-            console.log('Push token saved');
+            // Register token with backend so server can send targeted push notifications
+            await courierApi.updatePushToken(token);
+            if (__DEV__) console.log('Push token registered with backend');
         } catch (error) {
             console.error('Error saving push token:', error);
         }
@@ -194,21 +194,34 @@ class NotificationService {
 
         // Navigate based on notification type
         // This will be called with navigation reference from App.js
-        if (this.navigationRef) {
-            switch (data?.type) {
-                case 'new_job':
-                    this.navigationRef.navigate('DeliveryDetails', { deliveryId: data.delivery_id });
-                    break;
-                case 'delivery_update':
-                    this.navigationRef.navigate('DeliveryDetails', { deliveryId: data.delivery_id });
-                    break;
-                case 'earnings':
-                    this.navigationRef.navigate('Earnings');
-                    break;
-                default:
-                    this.navigationRef.navigate('Dashboard');
-                    break;
-            }
+        if (!this.navigationRef) return;
+
+        const deliveryId = data?.delivery_id || data?.assignment_id;
+
+        // Backend-sent notifications (e.g. new delivery assignment) carry a
+        // `screen` + `assignment_id` in their metadata - honor that first.
+        if (data?.screen === 'DeliveryDetails' && deliveryId) {
+            this.navigationRef.navigate('DeliveryDetails', { deliveryId });
+            return;
+        }
+
+        switch (data?.type) {
+            case 'new_job':
+            case 'delivery_update':
+            case 'shipping':
+                if (deliveryId) {
+                    this.navigationRef.navigate('DeliveryDetails', { deliveryId });
+                } else {
+                    this.navigationRef.navigate('Deliveries');
+                }
+                break;
+            case 'earnings':
+            case 'payment':
+                this.navigationRef.navigate('Earnings');
+                break;
+            default:
+                this.navigationRef.navigate('Home');
+                break;
         }
     };
 

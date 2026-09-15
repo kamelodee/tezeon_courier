@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     View,
     Text,
@@ -15,8 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { COLORS } from '../theme/colors';
 import courierApi from '../services/courierApi';
+import { useTheme } from '../theme/ThemeContext';
 
 const VEHICLE_TYPES = [
     { type: 'motorcycle', label: 'Motorcycle', icon: 'bicycle' },
@@ -27,6 +27,9 @@ const VEHICLE_TYPES = [
 ];
 
 const VehicleSetupScreen = ({ navigation, route }) => {
+    const theme_hook = useTheme();
+    const colors = theme_hook?.colors ?? {};
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const isFirstSetup = route.params?.isFirstSetup || false;
     const existingProfile = route.params?.profile || null;
 
@@ -245,7 +248,7 @@ const VehicleSetupScreen = ({ navigation, route }) => {
                 <Ionicons
                     name={item.icon}
                     size={28}
-                    color={vehicleType === item.type ? COLORS.white : COLORS.primary}
+                    color={vehicleType === item.type ? colors.white : colors.primary}
                 />
             </View>
             <Text style={[
@@ -256,7 +259,7 @@ const VehicleSetupScreen = ({ navigation, route }) => {
             </Text>
             {vehicleType === item.type && (
                 <View style={styles.checkBadge}>
-                    <Ionicons name="checkmark" size={12} color={COLORS.white} />
+                    <Ionicons name="checkmark" size={12} color={colors.white} />
                 </View>
             )}
         </TouchableOpacity>
@@ -275,12 +278,12 @@ const VehicleSetupScreen = ({ navigation, route }) => {
                     <>
                         <Image source={{ uri: value }} style={styles.documentPreview} />
                         <View style={styles.editBadge}>
-                            <Ionicons name="pencil" size={14} color={COLORS.white} />
+                            <Ionicons name="pencil" size={14} color={colors.white} />
                         </View>
                     </>
                 ) : (
                     <View style={styles.documentPlaceholder}>
-                        <Ionicons name="camera" size={28} color={COLORS.muted} />
+                        <Ionicons name="camera" size={28} color={colors.muted} />
                         <Text style={styles.documentPlaceholderText}>Tap to upload</Text>
                     </View>
                 )}
@@ -293,7 +296,7 @@ const VehicleSetupScreen = ({ navigation, route }) => {
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+                    <Ionicons name="arrow-back" size={24} color={colors.white} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>
                     {step === 1 ? 'Vehicle Setup' : 'Upload Documents'}
@@ -342,7 +345,7 @@ const VehicleSetupScreen = ({ navigation, route }) => {
                                             Registration Number <Text style={styles.required}>*</Text>
                                         </Text>
                                         <View style={styles.inputContainer}>
-                                            <Ionicons name="car" size={20} color={COLORS.muted} style={styles.inputIcon} />
+                                            <Ionicons name="car" size={20} color={colors.muted} style={styles.inputIcon} />
                                             <TextInput
                                                 style={styles.input}
                                                 placeholder="e.g. GR 1234-21"
@@ -403,7 +406,7 @@ const VehicleSetupScreen = ({ navigation, route }) => {
                                         NIA Number <Text style={styles.required}>*</Text>
                                     </Text>
                                     <View style={styles.inputContainer}>
-                                        <Ionicons name="card" size={20} color={COLORS.muted} style={styles.inputIcon} />
+                                        <Ionicons name="card" size={20} color={colors.muted} style={styles.inputIcon} />
                                         <TextInput
                                             style={styles.input}
                                             placeholder="e.g. GHA-123456789-0"
@@ -440,7 +443,7 @@ const VehicleSetupScreen = ({ navigation, route }) => {
                                             License Number <Text style={styles.required}>*</Text>
                                         </Text>
                                         <View style={styles.inputContainer}>
-                                            <Ionicons name="document" size={20} color={COLORS.muted} style={styles.inputIcon} />
+                                            <Ionicons name="document" size={20} color={colors.muted} style={styles.inputIcon} />
                                             <TextInput
                                                 style={styles.input}
                                                 placeholder="Your license number"
@@ -469,7 +472,7 @@ const VehicleSetupScreen = ({ navigation, route }) => {
                             )}
 
                             <View style={styles.infoBox}>
-                                <Ionicons name="shield-checkmark" size={20} color={COLORS.primary} />
+                                <Ionicons name="shield-checkmark" size={20} color={colors.primary} />
                                 <Text style={styles.infoText}>
                                     Your documents are encrypted and stored securely. They will only be used for verification.
                                 </Text>
@@ -486,7 +489,7 @@ const VehicleSetupScreen = ({ navigation, route }) => {
                 {step === 1 ? (
                     <TouchableOpacity style={styles.primaryButton} onPress={handleNext}>
                         <Text style={styles.primaryButtonText}>Continue</Text>
-                        <Ionicons name="arrow-forward" size={20} color={COLORS.white} />
+                        <Ionicons name="arrow-forward" size={20} color={colors.white} />
                     </TouchableOpacity>
                 ) : (
                     <TouchableOpacity
@@ -495,11 +498,11 @@ const VehicleSetupScreen = ({ navigation, route }) => {
                         disabled={saving}
                     >
                         {saving ? (
-                            <ActivityIndicator color={COLORS.white} />
+                            <ActivityIndicator color={colors.white} />
                         ) : (
                             <>
                                 <Text style={styles.primaryButtonText}>Complete Setup</Text>
-                                <Ionicons name="checkmark-circle" size={20} color={COLORS.white} />
+                                <Ionicons name="checkmark-circle" size={20} color={colors.white} />
                             </>
                         )}
                     </TouchableOpacity>
@@ -509,16 +512,16 @@ const VehicleSetupScreen = ({ navigation, route }) => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         paddingHorizontal: 16,
         paddingVertical: 14,
     },
@@ -533,7 +536,7 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: COLORS.white,
+        color: colors.white,
     },
     skipText: {
         fontSize: 14,
@@ -541,25 +544,25 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     progressContainer: {
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         padding: 16,
         borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
+        borderBottomColor: colors.border,
     },
     progressBar: {
         height: 6,
-        backgroundColor: COLORS.border,
+        backgroundColor: colors.border,
         borderRadius: 3,
         overflow: 'hidden',
     },
     progressFill: {
         height: '100%',
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         borderRadius: 3,
     },
     progressText: {
         fontSize: 12,
-        color: COLORS.muted,
+        color: colors.muted,
         marginTop: 8,
         textAlign: 'right',
     },
@@ -570,12 +573,12 @@ const styles = StyleSheet.create({
     stepTitle: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: COLORS.text,
+        color: colors.text,
         marginBottom: 8,
     },
     stepSubtitle: {
         fontSize: 15,
-        color: COLORS.muted,
+        color: colors.muted,
         marginBottom: 24,
     },
     vehicleGrid: {
@@ -586,37 +589,37 @@ const styles = StyleSheet.create({
     },
     vehicleOption: {
         width: '31%',
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderRadius: 16,
         padding: 16,
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
     },
     vehicleOptionSelected: {
-        borderColor: COLORS.primary,
-        backgroundColor: `${COLORS.primary}08`,
+        borderColor: colors.primary,
+        backgroundColor: `${colors.primary}08`,
     },
     vehicleIconContainer: {
         width: 56,
         height: 56,
         borderRadius: 28,
-        backgroundColor: `${COLORS.primary}15`,
+        backgroundColor: `${colors.primary}15`,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 8,
     },
     vehicleIconContainerSelected: {
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
     },
     vehicleLabel: {
         fontSize: 12,
-        color: COLORS.text,
+        color: colors.text,
         fontWeight: '500',
         textAlign: 'center',
     },
     vehicleLabelSelected: {
-        color: COLORS.primary,
+        color: colors.primary,
         fontWeight: '600',
     },
     checkBadge: {
@@ -626,7 +629,7 @@ const styles = StyleSheet.create({
         width: 20,
         height: 20,
         borderRadius: 10,
-        backgroundColor: COLORS.success,
+        backgroundColor: colors.success,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -639,7 +642,7 @@ const styles = StyleSheet.create({
     sectionLabel: {
         fontSize: 11,
         fontWeight: '700',
-        color: COLORS.muted,
+        color: colors.muted,
         letterSpacing: 1,
         marginBottom: 16,
     },
@@ -649,20 +652,20 @@ const styles = StyleSheet.create({
     inputLabel: {
         fontSize: 14,
         fontWeight: '600',
-        color: COLORS.text,
+        color: colors.text,
         marginBottom: 8,
     },
     required: {
-        color: COLORS.error,
+        color: colors.error,
     },
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderRadius: 12,
         paddingHorizontal: 14,
         borderWidth: 1,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
     },
     inputIcon: {
         marginRight: 10,
@@ -671,7 +674,7 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingVertical: 14,
         fontSize: 15,
-        color: COLORS.text,
+        color: colors.text,
     },
     row: {
         flexDirection: 'row',
@@ -687,21 +690,21 @@ const styles = StyleSheet.create({
     documentLabel: {
         fontSize: 13,
         fontWeight: '600',
-        color: COLORS.text,
+        color: colors.text,
         marginBottom: 8,
     },
     documentPicker: {
         height: 100,
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderRadius: 12,
         borderWidth: 2,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
         borderStyle: 'dashed',
         overflow: 'hidden',
     },
     documentPickerActive: {
         borderStyle: 'solid',
-        borderColor: COLORS.primary,
+        borderColor: colors.primary,
     },
     documentPlaceholder: {
         flex: 1,
@@ -710,7 +713,7 @@ const styles = StyleSheet.create({
     },
     documentPlaceholderText: {
         fontSize: 11,
-        color: COLORS.muted,
+        color: colors.muted,
         marginTop: 4,
     },
     documentPreview: {
@@ -731,7 +734,7 @@ const styles = StyleSheet.create({
     },
     infoBox: {
         flexDirection: 'row',
-        backgroundColor: `${COLORS.primary}10`,
+        backgroundColor: `${colors.primary}10`,
         padding: 14,
         borderRadius: 12,
         gap: 10,
@@ -740,19 +743,19 @@ const styles = StyleSheet.create({
     infoText: {
         flex: 1,
         fontSize: 13,
-        color: COLORS.primary,
+        color: colors.primary,
         lineHeight: 18,
     },
     bottomActions: {
         padding: 16,
         paddingBottom: 32,
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderTopWidth: 1,
-        borderTopColor: COLORS.border,
+        borderTopColor: colors.border,
     },
     primaryButton: {
         flexDirection: 'row',
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         paddingVertical: 16,
         borderRadius: 12,
         alignItems: 'center',
@@ -762,7 +765,7 @@ const styles = StyleSheet.create({
     primaryButtonText: {
         fontSize: 16,
         fontWeight: '600',
-        color: COLORS.white,
+        color: colors.white,
     },
     buttonDisabled: {
         opacity: 0.7,

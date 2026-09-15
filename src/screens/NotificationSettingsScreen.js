@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     View,
     Text,
@@ -11,8 +11,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { COLORS } from '../theme/colors';
 import notificationService from '../services/notificationService';
+import { useTheme } from '../theme/ThemeContext';
 
 const NOTIFICATION_SETTINGS_KEY = 'notification_settings';
 
@@ -27,6 +27,9 @@ const defaultSettings = {
 };
 
 const NotificationSettingsScreen = ({ navigation }) => {
+    const theme_hook = useTheme();
+    const colors = theme_hook?.colors ?? {};
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const [settings, setSettings] = useState(defaultSettings);
     const [loading, setLoading] = useState(true);
 
@@ -69,7 +72,7 @@ const NotificationSettingsScreen = ({ navigation }) => {
         saveSettings(newSettings);
     };
 
-    const SettingItem = ({ icon, title, description, settingKey, color = COLORS.primary }) => (
+    const SettingItem = ({ icon, title, description, settingKey, color = colors.primary }) => (
         <View style={styles.settingItem}>
             <View style={[styles.settingIcon, { backgroundColor: `${color}15` }]}>
                 <Ionicons name={icon} size={22} color={color} />
@@ -81,8 +84,8 @@ const NotificationSettingsScreen = ({ navigation }) => {
             <Switch
                 value={!!settings[settingKey]}
                 onValueChange={() => toggleSetting(settingKey)}
-                trackColor={{ false: COLORS.border, true: `${COLORS.primary}60` }}
-                thumbColor={settings[settingKey] ? COLORS.primary : COLORS.muted}
+                trackColor={{ false: colors.border, true: `${colors.primary}60` }}
+                thumbColor={settings[settingKey] ? colors.primary : colors.muted}
             />
         </View>
     );
@@ -92,7 +95,7 @@ const NotificationSettingsScreen = ({ navigation }) => {
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                    <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+                    <Ionicons name="arrow-back" size={24} color={colors.white} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Notification Settings</Text>
                 <View style={{ width: 40 }} />
@@ -169,7 +172,7 @@ const NotificationSettingsScreen = ({ navigation }) => {
 
                 {/* Info Card */}
                 <View style={styles.infoCard}>
-                    <Ionicons name="information-circle" size={24} color={COLORS.primary} />
+                    <Ionicons name="information-circle" size={24} color={colors.primary} />
                     <Text style={styles.infoText}>
                         We recommend keeping job notifications on to never miss earning opportunities.
                     </Text>
@@ -181,16 +184,16 @@ const NotificationSettingsScreen = ({ navigation }) => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         paddingHorizontal: 16,
         paddingVertical: 16,
     },
@@ -205,7 +208,7 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: COLORS.white,
+        color: colors.white,
     },
     content: {
         flex: 1,
@@ -217,12 +220,12 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 11,
         fontWeight: '600',
-        color: COLORS.muted,
+        color: colors.muted,
         marginBottom: 8,
         letterSpacing: 0.5,
     },
     sectionCard: {
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderRadius: 12,
         overflow: 'hidden',
     },
@@ -231,7 +234,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 16,
         borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
+        borderBottomColor: colors.border,
     },
     settingIcon: {
         width: 44,
@@ -248,17 +251,17 @@ const styles = StyleSheet.create({
     settingTitle: {
         fontSize: 15,
         fontWeight: '500',
-        color: COLORS.text,
+        color: colors.text,
     },
     settingDescription: {
         fontSize: 12,
-        color: COLORS.muted,
+        color: colors.muted,
         marginTop: 2,
     },
     infoCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: `${COLORS.primary}10`,
+        backgroundColor: `${colors.primary}10`,
         margin: 16,
         padding: 16,
         borderRadius: 12,
@@ -267,7 +270,7 @@ const styles = StyleSheet.create({
     infoText: {
         flex: 1,
         fontSize: 13,
-        color: COLORS.text,
+        color: colors.text,
         lineHeight: 18,
     },
 });

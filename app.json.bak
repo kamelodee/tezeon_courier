@@ -29,12 +29,7 @@
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
-        "FOREGROUND_SERVICE",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_BACKGROUND_LOCATION",
-        "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_LOCATION"
+        "FOREGROUND_SERVICE"
       ]
     },
     "ios": {
@@ -56,6 +51,12 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "extra": {
+      "eas": {
+        "projectId": "25822230-72fb-4dc2-8160-0f88581750ff"
+      }
+    },
+    "owner": "kamilo",
     "plugins": [
       [
         "expo-location",
@@ -66,21 +67,7 @@
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true
         }
-      ],
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "Tezeon Driver needs access to your photos to upload verification documents and vehicle photos.",
-          "cameraPermission": "Tezeon Driver uses your camera to take verification documents and proof of delivery photos."
-        }
-      ],
-      "expo-font"
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "606f3fa1-7c3d-4a5d-b714-85c0a522db20"
-      }
-    },
-    "owner": "kamilo23"
+      ]
+    ]
   }
 }

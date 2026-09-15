@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     View,
     Text,
@@ -11,22 +11,82 @@ import {
     TextInput,
     Modal,
     Image,
-    Platform
+    Platform,
+    ActionSheetIOS,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { hp } from '../utils/responsive';
 import courierApi from '../services/courierApi';
 import * as ImagePicker from 'expo-image-picker';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from '../components/Map';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE, PROVIDER_DEFAULT } from '../components/Map';
+
+const MAP_PROVIDER = Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT;
 import * as Location from 'expo-location';
 import SignatureScreen from 'react-native-signature-canvas';
 import * as FileSystem from 'expo-file-system';
 
+// Delivery workflow steps in order
+const DELIVERY_STEPS = [
+    { key: 'pending',    label: 'Accepted',  icon: 'checkmark-circle' },
+    { key: 'accepted',   label: 'Pickup',    icon: 'cube' },
+    { key: 'picked_up',  label: 'In Transit',icon: 'bicycle' },
+    { key: 'in_transit', label: 'Arrived',   icon: 'location' },
+    { key: 'arrived',    label: 'Delivered', icon: 'checkmark-done-circle' },
+];
+
+const StatusStepper = ({ status, colors }) => {
+    const currentIndex = DELIVERY_STEPS.findIndex(s => s.key === status);
+    // stepStyles is a module-level sheet (it predates the theme), so the
+    // theme-dependent bits are applied inline from the colors prop — otherwise
+    // this renders as a white band across the dark theme.
+    return (
+        <View style={[stepStyles.container, { backgroundColor: colors.card }]}>
+            {DELIVERY_STEPS.map((step, i) => {
+                const done = i <= currentIndex;
+                const active = i === currentIndex;
+                return (
+                    <View key={step.key} style={stepStyles.stepWrapper}>
+                        <View style={[
+                            stepStyles.dot,
+                            { backgroundColor: colors.border },
+                            done && { backgroundColor: colors.primary },
+                            active && stepStyles.dotActive,
+                        ]}>
+                            <Ionicons
+                                name={done ? step.icon : 'ellipse-outline'}
+                                size={active ? 20 : 16}
+                                color={done ? '#fff' : colors.border}
+                            />
+                        </View>
+                        <Text style={[stepStyles.label, { color: done ? colors.primary : colors.muted }]}>
+                            {step.label}
+                        </Text>
+                        {i < DELIVERY_STEPS.length - 1 && (
+                            <View style={[stepStyles.line, { backgroundColor: colors.border }, done && i < currentIndex && { backgroundColor: colors.primary }]} />
+                        )}
+                    </View>
+                );
+            })}
+        </View>
+    );
+};
+
+const stepStyles = StyleSheet.create({
+    container: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 20, backgroundColor: '#fff' },
+    stepWrapper: { alignItems: 'center', flex: 1, position: 'relative' },
+    dot: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' },
+    dotActive: { transform: [{ scale: 1.15 }], elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4 },
+    label: { fontSize: 10, marginTop: 4, fontWeight: '600', textAlign: 'center' },
+    line: { position: 'absolute', top: 18, left: '60%', right: '-40%', height: 2, backgroundColor: '#E5E7EB', zIndex: -1 },
+});
+
 const DeliveryDetailsScreen = ({ route, navigation }) => {
-    const { deliveryId } = route.params;
-    const [delivery, setDelivery] = useState(null);
+    const theme_hook = useTheme();
+    const colors = theme_hook?.colors ?? {};
+    const styles = useMemo(() => createStyles(colors), [colors]);
+    const { deliveryId } = route.params;    const [delivery, setDelivery] = useState(null);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
     const [showCompleteModal, setShowCompleteModal] = useState(false);
@@ -38,11 +98,41 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
     const [deliveryPhoto, setDeliveryPhoto] = useState(null);
     const [recipientSignature, setRecipientSignature] = useState(null);
     const [courierLocation, setCourierLocation] = useState(null);
+    const [userProfile, setUserProfile] = useState(null);
+    const [codCollected, setCodCollected] = useState(false);
+
+    // Unconditional hook call with safe name
+    const safeArea = useSafeAreaInsets();
 
     useEffect(() => {
-        loadDeliveryDetails();
-        loadCourierLocation();
+        loadData();
     }, [deliveryId]);
+
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            await Promise.all([
+                loadDeliveryDetails(),
+                loadCourierLocation(),
+                loadUserProfile()
+            ]);
+        } catch (e) {
+            console.log('Error loading initial data:', e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const loadUserProfile = async () => {
+        try {
+            const response = await courierApi.getProfile();
+            if (response.success) {
+                setUserProfile(response.data);
+            }
+        } catch (error) {
+            console.log('Error loading profile:', error);
+        }
+    };
 
     const loadCourierLocation = async () => {
         try {
@@ -82,8 +172,6 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
         } catch (error) {
             console.error('Load delivery details error:', error);
             Alert.alert('Error', 'Failed to load delivery details');
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -112,7 +200,7 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                 loadDeliveryDetails();
                 Alert.alert('Success', 'Status updated successfully');
             } else {
-                Alert.alert('Error', response.data?.error || 'Failed to update status');
+                Alert.alert('Error', response.error || 'Failed to update status');
             }
         } catch (error) {
             Alert.alert('Error', 'An error occurred');
@@ -214,16 +302,42 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
     };
 
     const pickImage = async () => {
-        const result = await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [4, 3],
-            quality: 0.8,
-        });
+        const launch = async (useCamera) => {
+            const fn = useCamera
+                ? ImagePicker.launchCameraAsync
+                : ImagePicker.launchImageLibraryAsync;
+            const result = await fn({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 0.8,
+            });
+            if (!result.canceled) setDeliveryPhoto(result.assets[0].uri);
+        };
 
-        if (!result.canceled) {
-            setDeliveryPhoto(result.assets[0].uri);
+        if (Platform.OS === 'ios') {
+            ActionSheetIOS.showActionSheetWithOptions(
+                { options: ['Cancel', 'Take Photo', 'Choose from Library'], cancelButtonIndex: 0 },
+                (i) => { if (i === 1) launch(true); if (i === 2) launch(false); }
+            );
+        } else {
+            Alert.alert('Add Photo', 'Choose source', [
+                { text: 'Camera', onPress: () => launch(true) },
+                { text: 'Gallery', onPress: () => launch(false) },
+                { text: 'Cancel', style: 'cancel' },
+            ]);
         }
+    };
+
+    const handleCodCollect = () => {
+        Alert.alert(
+            'Confirm Cash Collection',
+            `Confirm you have collected ₵${parseFloat(delivery?.cod_amount || 0).toFixed(2)} in cash from the customer.`,
+            [
+                { text: 'Not Yet', style: 'cancel' },
+                { text: 'Collected', style: 'default', onPress: () => setCodCollected(true) },
+            ]
+        );
     };
 
     const chatWithCustomer = () => {
@@ -275,17 +389,30 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
         }
     };
 
+    const getOrderSourceLabel = (source) => {
+        const labels = {
+            whatsapp: 'WhatsApp Order',
+            phone: 'Phone Order',
+            facebook: 'Facebook Order',
+            instagram: 'Instagram Order',
+            walk_in: 'Walk-in Order',
+            website: 'Website Order',
+            other: 'Sales Order',
+        };
+        return labels[source] || 'Sales Order';
+    };
+
     const getStatusColor = (status) => {
         const colors = {
-            pending: COLORS.warning,
-            accepted: COLORS.primary,
-            picked_up: COLORS.primaryDark,
-            in_transit: COLORS.secondary,
-            arrived: COLORS.success,
-            delivered: COLORS.success,
-            failed: COLORS.error
+            pending: colors.warning,
+            accepted: colors.primary,
+            picked_up: colors.primaryDark,
+            in_transit: colors.secondary,
+            arrived: colors.success,
+            delivered: colors.success,
+            failed: colors.error
         };
-        return colors[status] || COLORS.muted;
+        return colors[status] || colors.muted;
     };
 
     const getNextAction = () => {
@@ -309,27 +436,31 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
         return (
             <SafeAreaView style={styles.container}>
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={COLORS.primary} />
+                    <ActivityIndicator size="large" color={colors.primary} />
                 </View>
             </SafeAreaView>
         );
     }
 
     const nextAction = getNextAction();
-    const insets = useSafeAreaInsets();
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+                    <Ionicons name="arrow-back" size={24} color={colors.white} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Delivery Details</Text>
                 <View style={{ width: 40 }} />
             </View>
 
             <ScrollView style={styles.content}>
+                {/* Step progress indicator */}
+                {delivery?.status && !['delivered', 'failed'].includes(delivery.status) && (
+                    <StatusStepper status={delivery.status} colors={colors} />
+                )}
+
                 {/* MarketPlace Offered Price Banner */}
                 {delivery?.status === 'pending' && delivery?.is_marketplace && (
                     <View style={styles.marketplaceBanner}>
@@ -338,7 +469,7 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                             <Text style={styles.priceValue}>₵{parseFloat(delivery.offered_price || 0).toFixed(2)}</Text>
                         </View>
                         <View style={styles.marketBadge}>
-                            <Ionicons name="globe" size={16} color={COLORS.white} />
+                            <Ionicons name="globe" size={16} color={colors.white} />
                             <Text style={styles.marketText}>MARKETPLACE JOB</Text>
                         </View>
                     </View>
@@ -348,7 +479,7 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                 {delivery?.is_scheduled && delivery?.scheduled_pickup_time && (
                     <View style={styles.scheduledDeliveryBanner}>
                         <View style={styles.scheduledIconContainer}>
-                            <Ionicons name="calendar" size={24} color={COLORS.white} />
+                            <Ionicons name="calendar" size={24} color={colors.white} />
                         </View>
                         <View style={styles.scheduledContent}>
                             <Text style={styles.scheduledLabel}>Scheduled Pickup</Text>
@@ -363,13 +494,30 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                                 })}
                             </Text>
                         </View>
-                        <Ionicons name="time-outline" size={20} color={COLORS.white} style={{ opacity: 0.7 }} />
+                        <Ionicons name="time-outline" size={20} color={colors.white} style={{ opacity: 0.7 }} />
                     </View>
                 )}
 
                 <View style={styles.statusCard}>
-                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(delivery?.status) }]}>
-                        <Text style={styles.statusText}>{delivery?.status?.replace('_', ' ').toUpperCase()}</Text>
+                    <View style={styles.statusRow}>
+                        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(delivery?.status) }]}>
+                            <Text style={styles.statusText}>{delivery?.status?.replace(/_/g, ' ').toUpperCase()}</Text>
+                        </View>
+                        {delivery?.order_type && (
+                            <View style={[
+                                styles.orderTypeBadge,
+                                { backgroundColor: delivery.order_type === 'website' ? '#0288D1' : '#388E3C' }
+                            ]}>
+                                <Ionicons
+                                    name={delivery.order_type === 'website' ? 'globe-outline' : 'storefront-outline'}
+                                    size={12}
+                                    color={colors.white}
+                                />
+                                <Text style={styles.orderTypeBadgeText}>
+                                    {delivery.order_type === 'website' ? 'Website Order' : getOrderSourceLabel(delivery.order_source)}
+                                </Text>
+                            </View>
+                        )}
                     </View>
                     <Text style={styles.orderNumber}>{delivery?.order_number}</Text>
                     <Text style={styles.earning}>Earn: ₵{parseFloat(delivery?.courier_earning || 0).toFixed(2)}</Text>
@@ -380,7 +528,7 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                     <Text style={styles.sectionTitle}>ROUTE SUMMARY</Text>
                     <View style={styles.routeSummaryCard}>
                         <View style={styles.summaryItem}>
-                            <Ionicons name="bicycle" size={20} color={COLORS.primary} />
+                            <Ionicons name="bicycle" size={20} color={colors.primary} />
                             <View style={styles.summaryContent}>
                                 <Text style={styles.summaryLabel}>To Pickup</Text>
                                 <Text style={styles.summaryValue}>
@@ -393,7 +541,7 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                         </View>
                         <View style={styles.summaryDivider} />
                         <View style={styles.summaryItem}>
-                            <Ionicons name="location" size={20} color={COLORS.error} />
+                            <Ionicons name="location" size={20} color={colors.error} />
                             <View style={styles.summaryContent}>
                                 <Text style={styles.summaryLabel}>Total Delivery</Text>
                                 <Text style={styles.summaryValue}>
@@ -408,7 +556,7 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
 
                     <View style={styles.mapWrapper}>
                         <MapView
-                            provider={PROVIDER_GOOGLE}
+                            provider={MAP_PROVIDER}
                             style={styles.map}
                             initialRegion={{
                                 latitude: parseFloat(delivery?.pickup_latitude || 0),
@@ -421,7 +569,7 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                                 <Marker
                                     coordinate={courierLocation}
                                     title="You"
-                                    pinColor={COLORS.secondary}
+                                    pinColor={colors.secondary}
                                 />
                             )}
                             {delivery?.pickup_latitude && (
@@ -431,7 +579,7 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                                         longitude: parseFloat(delivery.pickup_longitude)
                                     }}
                                     title="Pickup"
-                                    pinColor={COLORS.primary}
+                                    pinColor={colors.primary}
                                 />
                             )}
                             {delivery?.delivery_latitude && (
@@ -441,7 +589,7 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                                         longitude: parseFloat(delivery.delivery_longitude)
                                     }}
                                     title="Delivery"
-                                    pinColor={COLORS.error}
+                                    pinColor={colors.error}
                                 />
                             )}
                             {delivery?.pickup_latitude && delivery?.delivery_latitude && (
@@ -450,7 +598,7 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                                         { latitude: parseFloat(delivery.pickup_latitude), longitude: parseFloat(delivery.pickup_longitude) },
                                         { latitude: parseFloat(delivery.delivery_latitude), longitude: parseFloat(delivery.delivery_longitude) }
                                     ]}
-                                    strokeColor={COLORS.primary}
+                                    strokeColor={colors.primary}
                                     strokeWidth={3}
                                 />
                             )}
@@ -463,31 +611,31 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                     <Text style={styles.sectionTitle}>CUSTOMER</Text>
                     <View style={styles.infoCard}>
                         <View style={styles.infoRow}>
-                            <Ionicons name="person" size={20} color={COLORS.primary} />
+                            <Ionicons name="person" size={20} color={colors.primary} />
                             <View style={styles.infoContent}>
                                 <Text style={styles.infoLabel}>Name</Text>
                                 <Text style={styles.infoValue}>{delivery?.delivery_contact_name}</Text>
                             </View>
                         </View>
                         <TouchableOpacity style={styles.infoRow} onPress={callCustomer}>
-                            <Ionicons name="call" size={20} color={COLORS.success} />
+                            <Ionicons name="call" size={20} color={colors.success} />
                             <View style={styles.infoContent}>
                                 <Text style={styles.infoLabel}>Phone</Text>
-                                <Text style={[styles.infoValue, { color: COLORS.primary }]}>
+                                <Text style={[styles.infoValue, { color: colors.primary }]}>
                                     {delivery?.delivery_contact_phone}
                                 </Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={20} color={COLORS.muted} />
+                            <Ionicons name="chevron-forward" size={20} color={colors.muted} />
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.infoRow} onPress={chatWithCustomer}>
-                            <Ionicons name="logo-whatsapp" size={20} color={COLORS.success} />
+                            <Ionicons name="logo-whatsapp" size={20} color={colors.success} />
                             <View style={styles.infoContent}>
                                 <Text style={styles.infoLabel}>Chat (WhatsApp)</Text>
-                                <Text style={[styles.infoValue, { color: COLORS.primary }]}>
+                                <Text style={[styles.infoValue, { color: colors.primary }]}>
                                     {delivery?.delivery_contact_phone}
                                 </Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={20} color={COLORS.muted} />
+                            <Ionicons name="chevron-forward" size={20} color={colors.muted} />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -500,17 +648,17 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                         onPress={() => openInMaps(delivery?.pickup_latitude, delivery?.pickup_longitude, delivery?.pickup_address)}
                     >
                         <View style={styles.addressContent}>
-                            <Ionicons name="business" size={24} color={COLORS.primary} />
+                            <Ionicons name="business" size={24} color={colors.primary} />
                             <Text style={styles.addressText}>{delivery?.pickup_address || 'Seller Location'}</Text>
                         </View>
                         <View style={styles.navigateButton}>
-                            <Ionicons name="navigate" size={20} color={COLORS.white} />
+                            <Ionicons name="navigate" size={20} color={colors.white} />
                             <Text style={styles.navigateText}>Navigate</Text>
                         </View>
                     </TouchableOpacity>
                     {delivery?.pickup_contact_phone ? (
                         <TouchableOpacity style={styles.pickupContact} onPress={() => Linking.openURL(`tel:${delivery.pickup_contact_phone}`)}>
-                            <Ionicons name="call" size={16} color={COLORS.success} />
+                            <Ionicons name="call" size={16} color={colors.success} />
                             <Text style={styles.pickupContactText}>Call Seller: {delivery.pickup_contact_phone}</Text>
                         </TouchableOpacity>
                     ) : null}
@@ -524,11 +672,11 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                         onPress={() => openInMaps(delivery?.delivery_latitude, delivery?.delivery_longitude, delivery?.delivery_address)}
                     >
                         <View style={styles.addressContent}>
-                            <Ionicons name="location" size={24} color={COLORS.error} />
+                            <Ionicons name="location" size={24} color={colors.error} />
                             <Text style={styles.addressText}>{delivery?.delivery_address}</Text>
                         </View>
                         <View style={styles.navigateButton}>
-                            <Ionicons name="navigate" size={20} color={COLORS.white} />
+                            <Ionicons name="navigate" size={20} color={colors.white} />
                             <Text style={styles.navigateText}>Navigate</Text>
                         </View>
                     </TouchableOpacity>
@@ -539,23 +687,30 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>INSTRUCTIONS</Text>
                         <View style={styles.instructionsCard}>
-                            <Ionicons name="information-circle" size={20} color={COLORS.warning} />
+                            <Ionicons name="information-circle" size={20} color={colors.warning} />
                             <Text style={styles.instructionsText}>{delivery?.delivery_instructions}</Text>
                         </View>
                     </View>
                 )}
 
                 {/* Order Items */}
-                {delivery?.items && delivery.items.length > 0 && (
+                {(delivery?.items && delivery.items.length > 0 || userProfile?.is_staff_member) && (
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>ORDER ITEMS</Text>
                         <View style={styles.itemsCard}>
-                            {delivery.items.map((item, index) => (
-                                <View key={index} style={styles.itemRow}>
-                                    <Text style={styles.itemName}>{item.product_name}</Text>
-                                    <Text style={styles.itemQty}>x{item.quantity}</Text>
+                            {delivery?.items && delivery.items.length > 0 ? (
+                                delivery.items.map((item, index) => (
+                                    <View key={index} style={styles.itemRow}>
+                                        <Text style={styles.itemName}>{item.product_name}</Text>
+                                        <Text style={styles.itemQty}>x{item.quantity}</Text>
+                                    </View>
+                                ))
+                            ) : (
+                                <View style={styles.emptyItemsContainer}>
+                                    <Ionicons name="information-circle-outline" size={20} color={colors.muted} />
+                                    <Text style={styles.emptyItemsText}>No items found in delivery payload</Text>
                                 </View>
-                            ))}
+                            )}
                         </View>
                     </View>
                 )}
@@ -564,12 +719,26 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                 {delivery?.is_cash_on_delivery && (
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>PAYMENT</Text>
-                        <View style={styles.codCard}>
-                            <Ionicons name="cash" size={24} color={COLORS.warning} />
-                            <View style={styles.codContent}>
-                                <Text style={styles.codLabel}>Cash on Delivery</Text>
-                                <Text style={styles.codAmount}>₵{parseFloat(delivery.cod_amount || 0).toFixed(2)}</Text>
+                        <View style={[styles.codCard, codCollected && { borderColor: colors.success, borderWidth: 1 }]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                <Ionicons name="cash" size={24} color={codCollected ? colors.success : colors.warning} />
+                                <View style={styles.codContent}>
+                                    <Text style={styles.codLabel}>Cash on Delivery</Text>
+                                    <Text style={[styles.codAmount, codCollected && { color: colors.success }]}>
+                                        ₵{parseFloat(delivery.cod_amount || 0).toFixed(2)}
+                                    </Text>
+                                </View>
                             </View>
+                            {!codCollected ? (
+                                <TouchableOpacity style={styles.codCollectBtn} onPress={handleCodCollect}>
+                                    <Text style={styles.codCollectText}>Collect</Text>
+                                </TouchableOpacity>
+                            ) : (
+                                <View style={styles.codDoneChip}>
+                                    <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+                                    <Text style={styles.codDoneText}>Collected</Text>
+                                </View>
+                            )}
                         </View>
                     </View>
                 )}
@@ -599,19 +768,37 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                 <View style={{ height: 120 }} />
             </ScrollView>
 
+            {/* Staff Visibility Badge */}
+            {userProfile?.is_staff_member && (
+                <View style={[styles.staffBadge, { top: safeArea.top + 60 }]}>
+                    <Ionicons name="shield-checkmark" size={14} color={colors.white} />
+                    <Text style={styles.staffBadgeText}>STAFF ACCESS</Text>
+                </View>
+            )}
+
             {/* Action Buttons */}
             {nextAction && (
-                <View style={[styles.actionContainer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+                <View style={[styles.actionContainer, { paddingBottom: Math.max(safeArea.bottom, 16) }]}>
                     {delivery?.status !== 'pending' && (
                         <TouchableOpacity
                             style={styles.failButton}
-                            onPress={() => navigation.navigate('SupportTicket', {
-                                deliveryId: delivery.id,
-                                reason: 'vehicle_breakdown' // Default or based on context
-                            })}
+                            onPress={() => {
+                                if (['in_transit', 'arrived', 'picked_up'].includes(delivery?.status)) {
+                                    navigation.navigate('FailedDelivery', {
+                                        deliveryId: delivery.id,
+                                        orderId: delivery.order_id || delivery.id,
+                                        customerName: delivery.delivery_contact_name || delivery.customer_name,
+                                        customerPhone: delivery.delivery_contact_phone || delivery.customer_phone,
+                                    });
+                                } else {
+                                    navigation.navigate('SupportTicket', { deliveryId: delivery.id });
+                                }
+                            }}
                         >
-                            <Ionicons name="alert-circle" size={20} color={COLORS.error} />
-                            <Text style={styles.failButtonText}>Issues</Text>
+                            <Ionicons name="alert-circle" size={20} color={colors.error} />
+                            <Text style={styles.failButtonText}>
+                                {['in_transit', 'arrived', 'picked_up'].includes(delivery?.status) ? 'Failed' : 'Issues'}
+                            </Text>
                         </TouchableOpacity>
                     )}
                     <TouchableOpacity
@@ -652,9 +839,9 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
 
                         {/* Keystone: OTP Entry */}
                         <View style={{ marginBottom: 16 }}>
-                            <Text style={{ fontSize: 12, color: COLORS.muted, marginBottom: 4, marginLeft: 4 }}>Ask Customer for Delivery Code</Text>
+                            <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4, marginLeft: 4 }}>Ask Customer for Delivery Code</Text>
                             <TextInput
-                                style={[styles.modalInput, { fontSize: 24, textAlign: 'center', letterSpacing: 8, fontWeight: 'bold', borderColor: COLORS.primary }]}
+                                style={[styles.modalInput, { fontSize: 24, textAlign: 'center', letterSpacing: 8, fontWeight: 'bold', borderColor: colors.primary }]}
                                 placeholder="0 0 0 0"
                                 value={deliveryCode}
                                 onChangeText={setDeliveryCode}
@@ -676,14 +863,14 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                                 style={[styles.proofToggle, !recipientSignature && styles.proofToggleActive]}
                                 onPress={() => setRecipientSignature(null)}
                             >
-                                <Ionicons name="camera" size={20} color={!recipientSignature ? COLORS.white : COLORS.muted} />
+                                <Ionicons name="camera" size={20} color={!recipientSignature ? colors.white : colors.muted} />
                                 <Text style={[styles.proofToggleText, !recipientSignature && styles.proofToggleTextActive]}>Photo</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.proofToggle, !!recipientSignature && styles.proofToggleActive]}
                                 onPress={() => { }} // Controlled by canvas
                             >
-                                <Ionicons name="pencil" size={20} color={!!recipientSignature ? COLORS.white : COLORS.muted} />
+                                <Ionicons name="pencil" size={20} color={!!recipientSignature ? colors.white : colors.muted} />
                                 <Text style={[styles.proofToggleText, !!recipientSignature && styles.proofToggleTextActive]}>Signature</Text>
                             </TouchableOpacity>
                         </View>
@@ -715,7 +902,7 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                                     <Image source={{ uri: deliveryPhoto }} style={styles.photoPreviewSmall} />
                                 ) : (
                                     <>
-                                        <Ionicons name="camera" size={24} color={COLORS.muted} />
+                                        <Ionicons name="camera" size={24} color={colors.muted} />
                                         <Text style={styles.photoButtonTextSmall}>Add Photo Proof (Optional)</Text>
                                     </>
                                 )}
@@ -767,7 +954,7 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                                 <Text style={styles.modalCancelText}>Cancel</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.modalConfirm, { backgroundColor: COLORS.error }, !!actionLoading && { opacity: 0.7 }]}
+                                style={[styles.modalConfirm, { backgroundColor: colors.error }, !!actionLoading && { opacity: 0.7 }]}
                                 onPress={handleFail}
                                 disabled={!!actionLoading}
                             >
@@ -785,33 +972,36 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
     );
 };
 
-const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: COLORS.background },
+const createStyles = (colors) => StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         padding: 16,
     },
     backButton: { padding: 4 },
-    headerTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.white },
+    headerTitle: { fontSize: 18, fontWeight: 'bold', color: colors.white },
 
     content: { flex: 1 },
 
     statusCard: {
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         padding: 20,
         alignItems: 'center',
         borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
+        borderBottomColor: colors.border,
     },
+    statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'center' },
     statusBadge: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
-    statusText: { color: COLORS.white, fontWeight: 'bold', fontSize: 12 },
-    orderNumber: { fontSize: 18, fontWeight: 'bold', color: COLORS.text, marginTop: 12 },
-    earning: { fontSize: 24, fontWeight: 'bold', color: COLORS.success, marginTop: 8 },
+    statusText: { color: colors.white, fontWeight: 'bold', fontSize: 12 },
+    orderTypeBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, gap: 4 },
+    orderTypeBadgeText: { color: colors.white, fontSize: 11, fontWeight: '600' },
+    orderNumber: { fontSize: 18, fontWeight: 'bold', color: colors.text, marginTop: 12 },
+    earning: { fontSize: 24, fontWeight: 'bold', color: colors.success, marginTop: 8 },
 
     marketplaceBanner: {
         backgroundColor: '#4A148C',
@@ -824,9 +1014,9 @@ const styles = StyleSheet.create({
     },
     priceContainer: {},
     priceLabel: { fontSize: 12, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 1 },
-    priceValue: { fontSize: 32, fontWeight: 'bold', color: COLORS.white, marginTop: 4 },
+    priceValue: { fontSize: 32, fontWeight: 'bold', color: colors.white, marginTop: 4 },
     marketBadge: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 6 },
-    marketText: { color: COLORS.white, fontSize: 11, fontWeight: 'bold' },
+    marketText: { color: colors.white, fontSize: 11, fontWeight: 'bold' },
 
     // Scheduled Delivery Banner Styles
     scheduledDeliveryBanner: {
@@ -858,12 +1048,12 @@ const styles = StyleSheet.create({
     scheduledTime: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: COLORS.white,
+        color: colors.white,
         marginTop: 2,
     },
 
     routeSummaryCard: {
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderRadius: 12,
         padding: 16,
         flexDirection: 'row',
@@ -873,48 +1063,52 @@ const styles = StyleSheet.create({
     },
     summaryItem: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
     summaryContent: {},
-    summaryLabel: { fontSize: 10, color: COLORS.muted, textTransform: 'uppercase' },
-    summaryValue: { fontSize: 16, fontWeight: 'bold', color: COLORS.text, marginTop: 2 },
-    summaryDivider: { width: 1, height: 30, backgroundColor: COLORS.border, marginHorizontal: 10 },
-    mapWrapper: { height: hp('30%'), borderRadius: 12, overflow: 'hidden', backgroundColor: COLORS.border },
+    summaryLabel: { fontSize: 10, color: colors.muted, textTransform: 'uppercase' },
+    summaryValue: { fontSize: 16, fontWeight: 'bold', color: colors.text, marginTop: 2 },
+    summaryDivider: { width: 1, height: 30, backgroundColor: colors.border, marginHorizontal: 10 },
+    mapWrapper: { height: hp('30%'), borderRadius: 12, overflow: 'hidden', backgroundColor: colors.border },
     map: { ...StyleSheet.absoluteFillObject },
 
     section: { padding: 16, paddingBottom: 0 },
-    sectionTitle: { fontSize: 11, fontWeight: '600', color: COLORS.muted, marginBottom: 8, letterSpacing: 0.5 },
+    sectionTitle: { fontSize: 11, fontWeight: '600', color: colors.muted, marginBottom: 8, letterSpacing: 0.5 },
 
-    infoCard: { backgroundColor: COLORS.white, borderRadius: 12, overflow: 'hidden' },
-    infoRow: { flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+    infoCard: { backgroundColor: colors.white, borderRadius: 12, overflow: 'hidden' },
+    infoRow: { flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
     infoContent: { flex: 1, marginLeft: 12 },
-    infoLabel: { fontSize: 12, color: COLORS.muted },
-    infoValue: { fontSize: 15, color: COLORS.text, fontWeight: '500', marginTop: 2 },
+    infoLabel: { fontSize: 12, color: colors.muted },
+    infoValue: { fontSize: 15, color: colors.text, fontWeight: '500', marginTop: 2 },
 
-    addressCard: { backgroundColor: COLORS.white, borderRadius: 12, padding: 16 },
+    addressCard: { backgroundColor: colors.white, borderRadius: 12, padding: 16 },
     addressContent: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
-    addressText: { flex: 1, fontSize: 14, color: COLORS.text, marginLeft: 12, lineHeight: 20 },
-    navigateButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primary, paddingVertical: 12, borderRadius: 8, gap: 8 },
-    navigateText: { color: COLORS.white, fontWeight: '600' },
-    pickupContact: { flexDirection: 'row', alignItems: 'center', marginTop: 12, backgroundColor: `${COLORS.success}10`, padding: 10, borderRadius: 8, gap: 8 },
-    pickupContactText: { color: COLORS.success, fontSize: 13, fontWeight: '600' },
+    addressText: { flex: 1, fontSize: 14, color: colors.text, marginLeft: 12, lineHeight: 20 },
+    navigateButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, paddingVertical: 12, borderRadius: 8, gap: 8 },
+    navigateText: { color: colors.white, fontWeight: '600' },
+    pickupContact: { flexDirection: 'row', alignItems: 'center', marginTop: 12, backgroundColor: `${colors.success}10`, padding: 10, borderRadius: 8, gap: 8 },
+    pickupContactText: { color: colors.success, fontSize: 13, fontWeight: '600' },
 
-    instructionsCard: { flexDirection: 'row', backgroundColor: `${COLORS.warning}15`, borderRadius: 12, padding: 16, gap: 12 },
-    instructionsText: { flex: 1, fontSize: 14, color: COLORS.text },
+    instructionsCard: { flexDirection: 'row', backgroundColor: `${colors.warning}15`, borderRadius: 12, padding: 16, gap: 12 },
+    instructionsText: { flex: 1, fontSize: 14, color: colors.text },
 
-    itemsCard: { backgroundColor: COLORS.white, borderRadius: 12, padding: 16 },
-    itemRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-    itemName: { fontSize: 14, color: COLORS.text },
-    itemQty: { fontSize: 14, fontWeight: '600', color: COLORS.muted },
+    itemsCard: { backgroundColor: colors.white, borderRadius: 12, padding: 16 },
+    itemRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
+    itemName: { fontSize: 14, color: colors.text },
+    itemQty: { fontSize: 14, fontWeight: '600', color: colors.muted },
 
-    codCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: `${COLORS.warning}15`, borderRadius: 12, padding: 16 },
+    codCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: `${colors.warning}15`, borderRadius: 12, padding: 16 },
     codContent: { marginLeft: 12 },
-    codLabel: { fontSize: 12, color: COLORS.muted },
-    codAmount: { fontSize: 20, fontWeight: 'bold', color: COLORS.warning },
+    codLabel: { fontSize: 12, color: colors.muted },
+    codAmount: { fontSize: 20, fontWeight: 'bold', color: colors.warning },
+    codCollectBtn: { backgroundColor: colors.warning, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
+    codCollectText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
+    codDoneChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: `${colors.success}15`, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
+    codDoneText: { color: colors.success, fontSize: 12, fontWeight: '600' },
 
-    timelineCard: { backgroundColor: COLORS.white, borderRadius: 12, padding: 16 },
+    timelineCard: { backgroundColor: colors.white, borderRadius: 12, padding: 16 },
     timelineItem: { flexDirection: 'row', marginBottom: 16 },
-    timelineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.primary, marginTop: 4, marginRight: 12 },
+    timelineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary, marginTop: 4, marginRight: 12 },
     timelineContent: {},
-    timelineStatus: { fontSize: 13, fontWeight: '600', color: COLORS.text },
-    timelineTime: { fontSize: 11, color: COLORS.muted, marginTop: 2 },
+    timelineStatus: { fontSize: 13, fontWeight: '600', color: colors.text },
+    timelineTime: { fontSize: 11, color: colors.muted, marginTop: 2 },
 
     actionContainer: {
         position: 'absolute',
@@ -923,9 +1117,9 @@ const styles = StyleSheet.create({
         right: 0,
         flexDirection: 'row',
         padding: 16,
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderTopWidth: 1,
-        borderTopColor: COLORS.border,
+        borderTopColor: colors.border,
         gap: 12,
     },
     failButton: {
@@ -936,50 +1130,85 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: COLORS.error,
+        borderColor: colors.error,
         gap: 8,
     },
-    failButtonText: { color: COLORS.error, fontWeight: '600' },
+    failButtonText: { color: colors.error, fontWeight: '600' },
     actionButton: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         paddingVertical: 14,
         borderRadius: 12,
         gap: 8,
     },
     actionButtonDisabled: { opacity: 0.7 },
-    actionButtonText: { color: COLORS.white, fontSize: 16, fontWeight: '600' },
+    actionButtonText: { color: colors.white, fontSize: 16, fontWeight: '600' },
 
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-    modalContent: { backgroundColor: COLORS.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 },
-    modalTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.text, marginBottom: 20, textAlign: 'center' },
-    modalInput: { backgroundColor: COLORS.background, borderRadius: 12, padding: 16, marginBottom: 12, fontSize: 15 },
-    photoButton: { alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.background, borderRadius: 12, padding: 24, marginBottom: 20, borderWidth: 2, borderColor: COLORS.border, borderStyle: 'dashed' },
-    photoButtonText: { color: COLORS.muted, marginTop: 8 },
+    modalContent: { backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 },
+    modalTitle: { fontSize: 18, fontWeight: 'bold', color: colors.text, marginBottom: 20, textAlign: 'center' },
+    modalInput: { backgroundColor: colors.background, borderRadius: 12, padding: 16, marginBottom: 12, fontSize: 15 },
+    photoButton: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background, borderRadius: 12, padding: 24, marginBottom: 20, borderWidth: 2, borderColor: colors.border, borderStyle: 'dashed' },
+    photoButtonText: { color: colors.muted, marginTop: 8 },
     photoPreview: { width: 150, height: 100, borderRadius: 8 },
     modalButtons: { flexDirection: 'row', gap: 12 },
-    modalCancel: { flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center' },
-    modalCancelText: { color: COLORS.text, fontWeight: '600' },
-    modalConfirm: { flex: 1, backgroundColor: COLORS.primary, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
-    modalConfirmText: { color: COLORS.white, fontWeight: '600' },
+    modalCancel: { flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
+    modalCancelText: { color: colors.text, fontWeight: '600' },
+    modalConfirm: { flex: 1, backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+    modalConfirmText: { color: colors.white, fontWeight: '600' },
 
-    proofContainer: { flexDirection: 'row', backgroundColor: COLORS.background, borderRadius: 12, padding: 4, marginBottom: 16 },
+    staffBadge: {
+        position: 'absolute',
+        right: 16,
+        backgroundColor: colors.secondary,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 20,
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+        gap: 6,
+        zIndex: 100,
+    },
+    staffBadgeText: {
+        color: colors.white,
+        fontSize: 10,
+        fontWeight: 'bold',
+        letterSpacing: 0.5,
+    },
+
+    proofContainer: { flexDirection: 'row', backgroundColor: colors.background, borderRadius: 12, padding: 4, marginBottom: 16 },
     proofToggle: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 10, gap: 8 },
-    proofToggleActive: { backgroundColor: COLORS.primary },
-    proofToggleText: { fontSize: 13, fontWeight: '600', color: COLORS.muted },
-    proofToggleTextActive: { color: COLORS.white },
+    proofToggleActive: { backgroundColor: colors.primary },
+    proofToggleText: { fontSize: 13, fontWeight: '600', color: colors.muted },
+    proofToggleTextActive: { color: colors.white },
     proofContent: { gap: 16, marginBottom: 20 },
-    signatureWrapper: { height: 180, backgroundColor: COLORS.white, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, overflow: 'hidden' },
-    signaturePreviewContainer: { height: 180, backgroundColor: COLORS.white, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
+    signatureWrapper: { height: 180, backgroundColor: colors.white, borderRadius: 12, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
+    signaturePreviewContainer: { height: 180, backgroundColor: colors.white, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
     signaturePreview: { width: '100%', height: 120 },
     clearSignature: { padding: 8 },
-    clearSignatureText: { color: COLORS.error, fontSize: 13, fontWeight: '600' },
-    photoButtonSmall: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.background, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: COLORS.border, borderStyle: 'dashed', gap: 10 },
-    photoButtonTextSmall: { color: COLORS.muted, fontSize: 13 },
+    clearSignatureText: { color: colors.error, fontSize: 13, fontWeight: '600' },
+    photoButtonSmall: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed', gap: 10 },
+    photoButtonTextSmall: { color: colors.muted, fontSize: 13 },
     photoPreviewSmall: { width: 60, height: 40, borderRadius: 4 },
+    emptyItemsContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        gap: 8,
+    },
+    emptyItemsText: {
+        color: colors.muted,
+        fontSize: 13,
+        fontStyle: 'italic',
+    },
 });
 
 export default DeliveryDetailsScreen;

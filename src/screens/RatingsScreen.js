@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -11,10 +11,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { TouchableOpacity } from 'react-native';
-import { COLORS } from '../theme/colors';
 import courierApi from '../services/courierApi';
+import { useTheme } from '../theme/ThemeContext';
 
 const RatingsScreen = ({ navigation }) => {
+    const theme_hook = useTheme();
+    const colors = theme_hook?.colors ?? {};
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const [ratings, setRatings] = useState([]);
     const [summary, setSummary] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -55,7 +58,7 @@ const RatingsScreen = ({ navigation }) => {
                     key={star}
                     name={star <= rating ? 'star' : 'star-outline'}
                     size={size}
-                    color={star <= rating ? COLORS.warning : COLORS.muted}
+                    color={star <= rating ? colors.warning : colors.muted}
                 />
             ))}
         </View>
@@ -66,7 +69,7 @@ const RatingsScreen = ({ navigation }) => {
         return (
             <View style={styles.distributionRow}>
                 <Text style={styles.distributionLabel}>{starCount}</Text>
-                <Ionicons name="star" size={12} color={COLORS.warning} />
+                <Ionicons name="star" size={12} color={colors.warning} />
                 <View style={styles.distributionBarBg}>
                     <View style={[styles.distributionBarFill, { width: `${percentage}%` }]} />
                 </View>
@@ -102,7 +105,7 @@ const RatingsScreen = ({ navigation }) => {
             )}
             {item.delivery_id && (
                 <View style={styles.deliveryRef}>
-                    <Ionicons name="cube-outline" size={14} color={COLORS.muted} />
+                    <Ionicons name="cube-outline" size={14} color={colors.muted} />
                     <Text style={styles.deliveryRefText}>Order #{item.delivery_id.slice(-8)}</Text>
                 </View>
             )}
@@ -113,7 +116,7 @@ const RatingsScreen = ({ navigation }) => {
         return (
             <SafeAreaView style={styles.container}>
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={COLORS.primary} />
+                    <ActivityIndicator size="large" color={colors.primary} />
                 </View>
             </SafeAreaView>
         );
@@ -124,7 +127,7 @@ const RatingsScreen = ({ navigation }) => {
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                    <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+                    <Ionicons name="arrow-back" size={24} color={colors.white} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>My Ratings</Text>
                 <View style={{ width: 40 }} />
@@ -136,7 +139,7 @@ const RatingsScreen = ({ navigation }) => {
                 keyExtractor={(item, index) => item.id?.toString() || index.toString()}
                 contentContainerStyle={styles.listContent}
                 refreshControl={
-                    <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
+                    <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
                 }
                 ListHeaderComponent={
                     <View>
@@ -167,7 +170,7 @@ const RatingsScreen = ({ navigation }) => {
                 }
                 ListEmptyComponent={
                     <View style={styles.emptyState}>
-                        <Ionicons name="star-outline" size={64} color={COLORS.muted} />
+                        <Ionicons name="star-outline" size={64} color={colors.muted} />
                         <Text style={styles.emptyTitle}>No Reviews Yet</Text>
                         <Text style={styles.emptyText}>
                             Complete deliveries to receive customer reviews
@@ -179,10 +182,10 @@ const RatingsScreen = ({ navigation }) => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
     },
     loadingContainer: {
         flex: 1,
@@ -193,7 +196,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         paddingHorizontal: 16,
         paddingVertical: 16,
     },
@@ -208,14 +211,14 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: COLORS.white,
+        color: colors.white,
     },
     listContent: {
         padding: 16,
     },
     summaryCard: {
         flexDirection: 'row',
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderRadius: 16,
         padding: 20,
         marginBottom: 20,
@@ -224,12 +227,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingRight: 20,
         borderRightWidth: 1,
-        borderRightColor: COLORS.border,
+        borderRightColor: colors.border,
     },
     averageRating: {
         fontSize: 48,
         fontWeight: 'bold',
-        color: COLORS.text,
+        color: colors.text,
     },
     starsContainer: {
         flexDirection: 'row',
@@ -238,7 +241,7 @@ const styles = StyleSheet.create({
     },
     totalRatings: {
         fontSize: 12,
-        color: COLORS.muted,
+        color: colors.muted,
         marginTop: 4,
     },
     summaryRight: {
@@ -254,35 +257,35 @@ const styles = StyleSheet.create({
     },
     distributionLabel: {
         fontSize: 12,
-        color: COLORS.text,
+        color: colors.text,
         width: 12,
     },
     distributionBarBg: {
         flex: 1,
         height: 6,
-        backgroundColor: COLORS.border,
+        backgroundColor: colors.border,
         borderRadius: 3,
         marginHorizontal: 8,
     },
     distributionBarFill: {
         height: '100%',
-        backgroundColor: COLORS.warning,
+        backgroundColor: colors.warning,
         borderRadius: 3,
     },
     distributionCount: {
         fontSize: 11,
-        color: COLORS.muted,
+        color: colors.muted,
         width: 24,
         textAlign: 'right',
     },
     sectionTitle: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: COLORS.text,
+        color: colors.text,
         marginBottom: 12,
     },
     ratingCard: {
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderRadius: 12,
         padding: 16,
         marginBottom: 12,
@@ -300,7 +303,7 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
@@ -308,21 +311,21 @@ const styles = StyleSheet.create({
     avatarText: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: COLORS.white,
+        color: colors.white,
     },
     customerName: {
         fontSize: 15,
         fontWeight: '600',
-        color: COLORS.text,
+        color: colors.text,
     },
     ratingDate: {
         fontSize: 12,
-        color: COLORS.muted,
+        color: colors.muted,
         marginTop: 2,
     },
     ratingComment: {
         fontSize: 14,
-        color: COLORS.text,
+        color: colors.text,
         fontStyle: 'italic',
         marginTop: 12,
         lineHeight: 20,
@@ -333,12 +336,12 @@ const styles = StyleSheet.create({
         marginTop: 12,
         paddingTop: 12,
         borderTopWidth: 1,
-        borderTopColor: COLORS.border,
+        borderTopColor: colors.border,
         gap: 6,
     },
     deliveryRefText: {
         fontSize: 12,
-        color: COLORS.muted,
+        color: colors.muted,
     },
     emptyState: {
         alignItems: 'center',
@@ -347,12 +350,12 @@ const styles = StyleSheet.create({
     emptyTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: COLORS.text,
+        color: colors.text,
         marginTop: 16,
     },
     emptyText: {
         fontSize: 14,
-        color: COLORS.muted,
+        color: colors.muted,
         marginTop: 8,
         textAlign: 'center',
     },

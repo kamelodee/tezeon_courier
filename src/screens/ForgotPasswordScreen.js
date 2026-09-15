@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
     View,
     Text,
@@ -13,16 +13,38 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../theme/colors';
 import courierApi from '../services/courierApi';
+import { useTheme } from '../theme/ThemeContext';
 
 const ForgotPasswordScreen = ({ navigation }) => {
+    const theme_hook = useTheme();
+    const colors = theme_hook?.colors ?? {};
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const [step, setStep] = useState('email'); // 'email' or 'otp'
     const [email, setEmail] = useState('');
     const [otp, setOtp] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [resendCountdown, setResendCountdown] = useState(0);
+    const timerRef = useRef(null);
+
+    useEffect(() => {
+        return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    }, []);
+
+    const startResendTimer = () => {
+        setResendCountdown(60);
+        timerRef.current = setInterval(() => {
+            setResendCountdown(prev => {
+                if (prev <= 1) {
+                    clearInterval(timerRef.current);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+    };
 
     const handleRequestOTP = async () => {
         if (!email.trim() || !email.includes('@')) {
@@ -35,6 +57,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
             const response = await courierApi.requestPasswordReset(email);
             if (response.success) {
                 setStep('otp');
+                startResendTimer();
                 Alert.alert('Code Sent', 'Please check your email for the verification code.');
             } else {
                 Alert.alert('Error', response.error || 'Failed to send verification code');
@@ -89,7 +112,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
             >
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                        <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+                        <Ionicons name="arrow-back" size={24} color={colors.text} />
                     </TouchableOpacity>
                 </View>
 
@@ -98,7 +121,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
                         <Ionicons
                             name={step === 'email' ? "lock-open-outline" : "shield-checkmark-outline"}
                             size={60}
-                            color={COLORS.primary}
+                            color={colors.primary}
                         />
                     </View>
 
@@ -116,7 +139,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
                         /* Step 1: Email Input */
                         <View style={styles.formContainer}>
                             <View style={styles.inputContainer}>
-                                <Ionicons name="mail-outline" size={20} color={COLORS.muted} style={styles.inputIcon} />
+                                <Ionicons name="mail-outline" size={20} color={colors.muted} style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
                                     placeholder="Email address"
@@ -145,7 +168,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
                         /* Step 2: OTP & New Password */
                         <View style={styles.formContainer}>
                             <View style={styles.inputContainer}>
-                                <Ionicons name="keypad-outline" size={20} color={COLORS.muted} style={styles.inputIcon} />
+                                <Ionicons name="keypad-outline" size={20} color={colors.muted} style={styles.inputIcon} />
                                 <TextInput
                                     style={[styles.input, { letterSpacing: 4 }]}
                                     placeholder="----"
@@ -153,12 +176,12 @@ const ForgotPasswordScreen = ({ navigation }) => {
                                     onChangeText={setOtp}
                                     keyboardType="number-pad"
                                     maxLength={6}
-                                    placeholderTextColor={COLORS.border}
+                                    placeholderTextColor={colors.border}
                                 />
                             </View>
 
                             <View style={styles.inputContainer}>
-                                <Ionicons name="lock-closed-outline" size={20} color={COLORS.muted} style={styles.inputIcon} />
+                                <Ionicons name="lock-closed-outline" size={20} color={colors.muted} style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
                                     placeholder="New Password"
@@ -170,7 +193,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
                                     <Ionicons
                                         name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                                         size={20}
-                                        color={COLORS.muted}
+                                        color={colors.muted}
                                     />
                                 </TouchableOpacity>
                             </View>
@@ -187,13 +210,37 @@ const ForgotPasswordScreen = ({ navigation }) => {
                                 )}
                             </TouchableOpacity>
 
-                            <TouchableOpacity
-                                style={styles.resendLink}
-                                onPress={() => setStep('email')}
-                                disabled={loading}
-                            >
-                                <Text style={styles.resendText}>Change Email / Resend Code</Text>
-                            </TouchableOpacity>
+                            <View style={styles.resendRow}>
+                                <TouchableOpacity
+                                    style={styles.resendLink}
+                                    onPress={() => setStep('email')}
+                                    disabled={loading}
+                                >
+                                    <Text style={styles.resendText}>Change Email</Text>
+                                </TouchableOpacity>
+                                <Text style={{ color: colors.muted }}> · </Text>
+                                <TouchableOpacity
+                                    style={[styles.resendLink, resendCountdown > 0 && { opacity: 0.4 }]}
+                                    onPress={async () => {
+                                        if (resendCountdown > 0) return;
+                                        setLoading(true);
+                                        try {
+                                            const res = await courierApi.requestPasswordReset(email);
+                                            if (res.success) {
+                                                startResendTimer();
+                                                Alert.alert('Code Sent', 'A new code has been sent to your email.');
+                                            }
+                                        } finally {
+                                            setLoading(false);
+                                        }
+                                    }}
+                                    disabled={loading || resendCountdown > 0}
+                                >
+                                    <Text style={styles.resendText}>
+                                        {resendCountdown > 0 ? `Resend in ${resendCountdown}s` : 'Resend Code'}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     )}
                 </ScrollView>
@@ -202,10 +249,10 @@ const ForgotPasswordScreen = ({ navigation }) => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
     },
     header: {
         padding: 16,
@@ -226,13 +273,13 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: COLORS.text,
+        color: colors.text,
         marginBottom: 12,
         textAlign: 'center',
     },
     subtitle: {
         fontSize: 16,
-        color: COLORS.muted,
+        color: colors.muted,
         textAlign: 'center',
         marginBottom: 32,
         lineHeight: 24,
@@ -243,12 +290,12 @@ const styles = StyleSheet.create({
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
         borderRadius: 12,
         paddingHorizontal: 16,
         marginBottom: 16,
         borderWidth: 1,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
         height: 56,
     },
     inputIcon: {
@@ -257,11 +304,11 @@ const styles = StyleSheet.create({
     input: {
         flex: 1,
         fontSize: 16,
-        color: COLORS.text,
+        color: colors.text,
         height: '100%'
     },
     button: {
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         paddingVertical: 16,
         borderRadius: 12,
         alignItems: 'center',
@@ -271,19 +318,23 @@ const styles = StyleSheet.create({
         opacity: 0.7,
     },
     buttonText: {
-        color: COLORS.white,
+        color: colors.white,
         fontSize: 16,
         fontWeight: '600',
     },
-    resendLink: {
-        marginTop: 20,
+    resendRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
         alignItems: 'center',
-        padding: 10
+        marginTop: 20,
+    },
+    resendLink: {
+        padding: 8,
     },
     resendText: {
-        color: COLORS.primary,
+        color: colors.primary,
         fontSize: 14,
-        fontWeight: '500'
+        fontWeight: '500',
     }
 });
 

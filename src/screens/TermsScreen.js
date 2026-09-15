@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
     View,
     Text,
@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 const sections = [
     {
@@ -98,12 +98,15 @@ Address: Accra, Ghana`
 ];
 
 const TermsScreen = ({ navigation }) => {
+    const theme_hook = useTheme();
+    const colors = theme_hook?.colors ?? {};
+    const styles = useMemo(() => createStyles(colors), [colors]);
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                    <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+                    <Ionicons name="arrow-back" size={24} color={colors.white} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Terms & Conditions</Text>
                 <View style={{ width: 40 }} />
@@ -112,7 +115,7 @@ const TermsScreen = ({ navigation }) => {
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                 {/* Last Updated */}
                 <View style={styles.lastUpdated}>
-                    <Ionicons name="time-outline" size={16} color={COLORS.muted} />
+                    <Ionicons name="time-outline" size={16} color={colors.muted} />
                     <Text style={styles.lastUpdatedText}>Last updated: January 1, 2026</Text>
                 </View>
 
@@ -134,7 +137,7 @@ const TermsScreen = ({ navigation }) => {
 
                 {/* Agreement */}
                 <View style={styles.agreementCard}>
-                    <Ionicons name="checkmark-circle" size={24} color={COLORS.success} />
+                    <Ionicons name="checkmark-circle" size={24} color={colors.success} />
                     <Text style={styles.agreementText}>
                         By using this app, you confirm that you have read, understood, and agree
                         to these Terms and Conditions.
@@ -147,16 +150,16 @@ const TermsScreen = ({ navigation }) => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         paddingHorizontal: 16,
         paddingVertical: 16,
     },
@@ -171,7 +174,7 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: COLORS.white,
+        color: colors.white,
     },
     content: {
         flex: 1,
@@ -185,19 +188,19 @@ const styles = StyleSheet.create({
     },
     lastUpdatedText: {
         fontSize: 12,
-        color: COLORS.muted,
+        color: colors.muted,
     },
     introCard: {
-        backgroundColor: `${COLORS.primary}10`,
+        backgroundColor: `${colors.primary}10`,
         borderRadius: 12,
         padding: 16,
         marginBottom: 20,
         borderLeftWidth: 4,
-        borderLeftColor: COLORS.primary,
+        borderLeftColor: colors.primary,
     },
     introText: {
         fontSize: 14,
-        color: COLORS.text,
+        color: colors.text,
         lineHeight: 22,
     },
     section: {
@@ -206,17 +209,17 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: COLORS.text,
+        color: colors.text,
         marginBottom: 8,
     },
     sectionContent: {
         fontSize: 14,
-        color: COLORS.muted,
+        color: colors.muted,
         lineHeight: 22,
     },
     agreementCard: {
         flexDirection: 'row',
-        backgroundColor: `${COLORS.success}15`,
+        backgroundColor: `${colors.success}15`,
         borderRadius: 12,
         padding: 16,
         gap: 12,
@@ -225,7 +228,7 @@ const styles = StyleSheet.create({
     agreementText: {
         flex: 1,
         fontSize: 13,
-        color: COLORS.text,
+        color: colors.text,
         lineHeight: 20,
     },
 });

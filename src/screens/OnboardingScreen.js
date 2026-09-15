@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
     View,
     Text,
@@ -6,12 +6,18 @@ import {
     Dimensions,
     TouchableOpacity,
     FlatList,
-    Animated
+    Animated,
+    Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { COLORS } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
+
+// Full Tezeon lockup rather than the app icon plus a hand-set 'Tezeon' label,
+// which never quite matched the real wordmark's spacing or weight.
+const WORDMARK_DARK_INK = require('../../assets/tezeon-wordmark.png');
+const WORDMARK_LIGHT_INK = require('../../assets/tezeon-wordmark-white.png');
 
 const { width, height } = Dimensions.get('window');
 
@@ -21,7 +27,9 @@ const slides = [
         icon: 'bicycle',
         title: 'Welcome to Tezeon Courier',
         description: 'Your partner in delivery excellence. Join thousands of couriers earning on their own schedule.',
-        color: COLORS.primary,
+        // Literal, like the sibling slides: this array is module scope, so it
+        // cannot read the theme, and a slide accent is brand orange either way.
+        color: '#FF6B35',
     },
     {
         id: '2',
@@ -47,6 +55,9 @@ const slides = [
 ];
 
 const OnboardingScreen = ({ navigation }) => {
+    const theme_hook = useTheme();
+    const colors = theme_hook?.colors ?? {};
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const scrollX = useRef(new Animated.Value(0)).current;
     const flatListRef = useRef(null);
@@ -153,6 +164,17 @@ const OnboardingScreen = ({ navigation }) => {
 
     return (
         <SafeAreaView style={styles.container}>
+            {/* Logo */}
+            <View style={styles.logoRow}>
+                <Image
+                    source={theme_hook?.isDark ? WORDMARK_LIGHT_INK : WORDMARK_DARK_INK}
+                    style={styles.wordmark}
+                    resizeMode="contain"
+                    accessibilityRole="image"
+                    accessibilityLabel="Tezeon"
+                />
+            </View>
+
             {/* Skip Button */}
             <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
                 <Text style={styles.skipText}>Skip</Text>
@@ -190,7 +212,7 @@ const OnboardingScreen = ({ navigation }) => {
                     ) : (
                         <>
                             <Text style={styles.nextButtonText}>Next</Text>
-                            <Ionicons name="arrow-forward" size={20} color={COLORS.white} />
+                            <Ionicons name="arrow-forward" size={20} color={colors.white} />
                         </>
                     )}
                 </TouchableOpacity>
@@ -199,10 +221,21 @@ const OnboardingScreen = ({ navigation }) => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
+    },
+    logoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 24,
+        paddingTop: 16,
+        gap: 8,
+    },
+    wordmark: {
+        width: 150,
+        height: 34,
     },
     skipButton: {
         position: 'absolute',
@@ -213,7 +246,7 @@ const styles = StyleSheet.create({
     },
     skipText: {
         fontSize: 16,
-        color: COLORS.muted,
+        color: colors.muted,
         fontWeight: '500',
     },
     slide: {
@@ -240,13 +273,13 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: COLORS.text,
+        color: colors.text,
         textAlign: 'center',
         marginBottom: 16,
     },
     description: {
         fontSize: 16,
-        color: COLORS.muted,
+        color: colors.muted,
         textAlign: 'center',
         lineHeight: 24,
     },
@@ -277,7 +310,7 @@ const styles = StyleSheet.create({
     nextButtonText: {
         fontSize: 18,
         fontWeight: '600',
-        color: COLORS.white,
+        color: colors.white,
     },
 });
 

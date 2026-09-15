@@ -444,8 +444,13 @@ class CourierAPI {
 
     async getAvailableDeliveries() {
         try {
-            const data = await this.request(`${COURIER_URL}/deliveries/available/`);
-            return { success: true, data: data.data || data.results || data };
+            const res = await this.request(`${COURIER_URL}/deliveries/available/`);
+            return {
+                success: true,
+                data: res.data || res.results || [],
+                is_premium: res.is_premium ?? false,
+                is_freelance: res.is_freelance ?? true,
+            };
         } catch (error) {
             return { success: false, error: error.message, data: [] };
         }
@@ -558,9 +563,15 @@ class CourierAPI {
     async getDeliveryHistory(page = 1) {
         try {
             const data = await this.request(`${COURIER_URL}/history/?page=${page}`);
-            return { success: true, data: data.data || data.results || data };
+            const items = data.data || data.results || (Array.isArray(data) ? data : []);
+            return {
+                success: true,
+                data: items,
+                total: data.total ?? data.count ?? items.length,
+                page: data.page ?? page,
+            };
         } catch (error) {
-            return { success: false, data: [] };
+            return { success: false, data: [], total: 0 };
         }
     }
 
@@ -586,15 +597,125 @@ class CourierAPI {
         }
     }
 
-    async reportIssue(data) {
+    /**
+     * Raise a support ticket.
+     *
+     * NOTE: there is no /courier/support/ route on the backend — the courier app
+     * used to POST to /courier/support/report/, which 404s, so issue reporting
+     * from HelpSupportScreen and SupportTicketScreen never worked. The real
+     * endpoint is the shared /support/tickets/ (TicketCreateSerializer), which
+     * requires `subject` and `description`; `issue_type` is not a field there,
+     * so it is folded into the subject line.
+     *
+     * Caveat for the backend owner: TicketCreateSerializer sets BOTH `seller`
+     * and `customer` to request.user, so courier-raised tickets land in the
+     * seller ticket queues. That is a modelling quirk to resolve server-side,
+     * not something the client can control.
+     */
+    async reportIssue({ issue_type = 'general', description = '', delivery_id, subject } = {}) {
+        const readableType = String(issue_type).replace(/_/g, ' ').trim() || 'general';
+        const finalSubject = subject
+            || `Courier issue: ${readableType}${delivery_id ? ` (delivery ${delivery_id})` : ''}`;
         try {
-            const result = await this.request(`${COURIER_URL}/support/report/`, {
+            const result = await this.request('/support/tickets/', {
                 method: 'POST',
-                body: JSON.stringify(data)
+                body: JSON.stringify({
+                    subject: finalSubject.slice(0, 255),
+                    description: delivery_id
+                        ? `${description}
+
+Delivery ID: ${delivery_id}`
+                        : description,
+                    priority: 'medium',
+                })
             });
             return { success: true, data: result };
         } catch (error) {
             return { success: false, error: error.message };
+        }
+    }
+
+    // Push Notifications
+    async updatePushToken(token) {
+        try {
+            await this.request(`${COURIER_URL}/profile/push_token/`, {
+                method: 'POST',
+                body: JSON.stringify({ push_token: token })
+            });
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    // Earnings Chart (weekly performance data)
+    async getEarningsChart(period = 'week') {
+        try {
+            const data = await this.request(`${COURIER_URL}/earnings/chart/?period=${period}`);
+            return { success: true, data: data.data || data };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    // Notifications list
+    async getNotifications(page = 1) {
+        try {
+            const data = await this.request(`/notifications/?page=${page}`);
+            return { success: true, data: data.results || data };
+        } catch (error) {
+            return { success: false, data: [] };
+        }
+    }
+
+    /**
+     * Mark one or more notifications as read.
+     *
+     * The route is COLLECTION-level with a hyphen: /notifications/mark-read/,
+     * taking { notification_ids: [...] } (NotificationMarkReadSerializer).
+     * The app previously called /notifications/{id}/mark_read/ — detail-level
+     * with an underscore — which is not registered and always 404'd, so
+     * notifications could never actually be marked read.
+     */
+    async markNotificationRead(id) {
+        const ids = Array.isArray(id) ? id : [id];
+        try {
+            await this.request('/notifications/mark-read/', {
+                method: 'POST',
+                body: JSON.stringify({ notification_ids: ids }),
+            });
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    // ── Failed Delivery SOP (Rider) ──────────────────────────────────────────
+
+    async reportFailedDelivery(deliveryId, formData) {
+        try {
+            const token = await this.getAuthToken();
+            const url = `${this.baseURL}${COURIER_URL}/deliveries/${deliveryId}/report_failed/`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData,
+            });
+            const text = await response.text();
+            const data = JSON.parse(text);
+            if (!response.ok) throw new Error(data?.detail || data?.error || 'Failed to submit report');
+            return { success: true, data };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    async getMyFailedDeliveries() {
+        try {
+            const data = await this.request(`${COURIER_URL}/deliveries/my_failures/`);
+            return { success: true, data: data.results || data.data || (Array.isArray(data) ? data : []) };
+        } catch (error) {
+            return { success: false, data: [], error: error.message };
         }
     }
 }

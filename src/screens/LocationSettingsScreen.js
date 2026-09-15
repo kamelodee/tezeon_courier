@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     View,
     Text,
@@ -14,8 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
-import { COLORS } from '../theme/colors';
 import backgroundService from '../services/backgroundService';
+import { useTheme } from '../theme/ThemeContext';
 
 const LOCATION_SETTINGS_KEY = 'location_settings';
 
@@ -26,6 +26,9 @@ const defaultSettings = {
 };
 
 const LocationSettingsScreen = ({ navigation }) => {
+    const theme_hook = useTheme();
+    const colors = theme_hook?.colors ?? {};
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const [settings, setSettings] = useState(defaultSettings);
     const [loading, setLoading] = useState(true);
     const [foregroundPermission, setForegroundPermission] = useState(null);
@@ -153,7 +156,7 @@ const LocationSettingsScreen = ({ navigation }) => {
         }
     };
 
-    const PermissionItem = ({ icon, title, description, status, onPress, color = COLORS.primary }) => (
+    const PermissionItem = ({ icon, title, description, status, onPress, color = colors.primary }) => (
         <TouchableOpacity style={styles.settingItem} onPress={onPress}>
             <View style={[styles.settingIcon, { backgroundColor: `${color}15` }]}>
                 <Ionicons name={icon} size={22} color={color} />
@@ -176,7 +179,7 @@ const LocationSettingsScreen = ({ navigation }) => {
         </TouchableOpacity>
     );
 
-    const SettingItem = ({ icon, title, description, settingKey, color = COLORS.primary }) => (
+    const SettingItem = ({ icon, title, description, settingKey, color = colors.primary }) => (
         <View style={styles.settingItem}>
             <View style={[styles.settingIcon, { backgroundColor: `${color}15` }]}>
                 <Ionicons name={icon} size={22} color={color} />
@@ -188,13 +191,13 @@ const LocationSettingsScreen = ({ navigation }) => {
             <Switch
                 value={!!settings[settingKey]}
                 onValueChange={() => toggleSetting(settingKey)}
-                trackColor={{ false: COLORS.border, true: `${COLORS.primary}60` }}
-                thumbColor={settings[settingKey] ? COLORS.primary : COLORS.muted}
+                trackColor={{ false: colors.border, true: `${colors.primary}60` }}
+                thumbColor={settings[settingKey] ? colors.primary : colors.muted}
             />
         </View>
     );
 
-    const ActionItem = ({ icon, title, description, isActive, onPress, color = COLORS.primary }) => (
+    const ActionItem = ({ icon, title, description, isActive, onPress, color = colors.primary }) => (
         <TouchableOpacity style={styles.settingItem} onPress={onPress}>
             <View style={[styles.settingIcon, { backgroundColor: `${color}15` }]}>
                 <Ionicons name={icon} size={22} color={color} />
@@ -222,7 +225,7 @@ const LocationSettingsScreen = ({ navigation }) => {
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                    <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+                    <Ionicons name="arrow-back" size={24} color={colors.white} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Location Settings</Text>
                 <View style={{ width: 40 }} />
@@ -290,7 +293,7 @@ const LocationSettingsScreen = ({ navigation }) => {
 
                 {/* Info Card */}
                 <View style={styles.infoCard}>
-                    <Ionicons name="information-circle" size={24} color={COLORS.primary} />
+                    <Ionicons name="information-circle" size={24} color={colors.primary} />
                     <Text style={styles.infoText}>
                         Background location is required to receive nearby delivery jobs and track your position during active deliveries. This helps customers know when to expect their orders.
                     </Text>
@@ -298,7 +301,7 @@ const LocationSettingsScreen = ({ navigation }) => {
 
                 {/* Open Settings Button */}
                 <TouchableOpacity style={styles.settingsButton} onPress={() => Linking.openSettings()}>
-                    <Ionicons name="settings-outline" size={20} color={COLORS.white} />
+                    <Ionicons name="settings-outline" size={20} color={colors.white} />
                     <Text style={styles.settingsButtonText}>Open Device Settings</Text>
                 </TouchableOpacity>
 
@@ -308,16 +311,16 @@ const LocationSettingsScreen = ({ navigation }) => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         paddingHorizontal: 16,
         paddingVertical: 16,
     },
@@ -332,7 +335,7 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: COLORS.white,
+        color: colors.white,
     },
     content: {
         flex: 1,
@@ -344,12 +347,12 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 11,
         fontWeight: '600',
-        color: COLORS.muted,
+        color: colors.muted,
         marginBottom: 8,
         letterSpacing: 0.5,
     },
     sectionCard: {
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderRadius: 12,
         overflow: 'hidden',
     },
@@ -358,7 +361,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 16,
         borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
+        borderBottomColor: colors.border,
     },
     settingIcon: {
         width: 44,
@@ -375,11 +378,11 @@ const styles = StyleSheet.create({
     settingTitle: {
         fontSize: 15,
         fontWeight: '500',
-        color: COLORS.text,
+        color: colors.text,
     },
     settingDescription: {
         fontSize: 12,
-        color: COLORS.muted,
+        color: colors.muted,
         marginTop: 2,
     },
     statusBadge: {
@@ -394,7 +397,7 @@ const styles = StyleSheet.create({
     infoCard: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        backgroundColor: `${COLORS.primary}10`,
+        backgroundColor: `${colors.primary}10`,
         margin: 16,
         padding: 16,
         borderRadius: 12,
@@ -403,14 +406,14 @@ const styles = StyleSheet.create({
     infoText: {
         flex: 1,
         fontSize: 13,
-        color: COLORS.text,
+        color: colors.text,
         lineHeight: 18,
     },
     settingsButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         marginHorizontal: 16,
         padding: 14,
         borderRadius: 12,
@@ -419,7 +422,7 @@ const styles = StyleSheet.create({
     settingsButtonText: {
         fontSize: 15,
         fontWeight: '600',
-        color: COLORS.white,
+        color: colors.white,
     },
 });
 

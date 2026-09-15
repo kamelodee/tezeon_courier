@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     View,
     Text,
@@ -15,10 +15,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { COLORS } from '../theme/colors';
 import courierApi from '../services/courierApi';
+import { useTheme } from '../theme/ThemeContext';
 
 const VerificationScreen = ({ navigation, route }) => {
+    const theme_hook = useTheme();
+    const colors = theme_hook?.colors ?? {};
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const [profile, setProfile] = useState(route.params?.profile || null);
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -151,13 +154,13 @@ const VerificationScreen = ({ navigation, route }) => {
                     <Image source={{ uri: value.startsWith('http') ? value : value }} style={styles.previewImage} />
                 ) : (
                     <View style={styles.pickerPlaceholder}>
-                        <Ionicons name={icon} size={32} color={COLORS.muted} />
+                        <Ionicons name={icon} size={32} color={colors.muted} />
                         <Text style={styles.pickerText}>Click to upload</Text>
                     </View>
                 )}
                 {value && (
                     <View style={styles.editOverlay}>
-                        <Ionicons name="pencil" size={20} color={COLORS.white} />
+                        <Ionicons name="pencil" size={20} color={colors.white} />
                     </View>
                 )}
             </TouchableOpacity>
@@ -168,7 +171,7 @@ const VerificationScreen = ({ navigation, route }) => {
         return (
             <SafeAreaView style={styles.container}>
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={COLORS.primary} />
+                    <ActivityIndicator size="large" color={colors.primary} />
                 </View>
             </SafeAreaView>
         );
@@ -178,7 +181,7 @@ const VerificationScreen = ({ navigation, route }) => {
         <SafeAreaView style={styles.container} edges={['top']}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+                    <Ionicons name="arrow-back" size={24} color={colors.white} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Account Verification</Text>
                 <View style={{ width: 24 }} />
@@ -190,7 +193,7 @@ const VerificationScreen = ({ navigation, route }) => {
             >
                 <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
                     <View style={styles.infoBox}>
-                        <Ionicons name="shield-checkmark-outline" size={24} color={COLORS.primary} />
+                        <Ionicons name="shield-checkmark-outline" size={24} color={colors.primary} />
                         <Text style={styles.infoText}>
                             To go online, please upload clear photos of your ID and License.
                         </Text>
@@ -202,7 +205,7 @@ const VerificationScreen = ({ navigation, route }) => {
                         <View style={styles.inputGroup}>
                             <Text style={styles.inputLabel}>NIA Number</Text>
                             <View style={styles.inputContainer}>
-                                <Ionicons name="card-outline" size={20} color={COLORS.muted} style={styles.inputIcon} />
+                                <Ionicons name="card-outline" size={20} color={colors.muted} style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
                                     placeholder="e.g. GHA-123456789-0"
@@ -236,7 +239,7 @@ const VerificationScreen = ({ navigation, route }) => {
                         <View style={styles.inputGroup}>
                             <Text style={styles.inputLabel}>License Number</Text>
                             <View style={styles.inputContainer}>
-                                <Ionicons name="car-outline" size={20} color={COLORS.muted} style={styles.inputIcon} />
+                                <Ionicons name="car-outline" size={20} color={colors.muted} style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
                                     placeholder="Driving license number"
@@ -271,7 +274,7 @@ const VerificationScreen = ({ navigation, route }) => {
                             disabled={uploading}
                         >
                             {uploading ? (
-                                <ActivityIndicator color={COLORS.white} />
+                                <ActivityIndicator color={colors.white} />
                             ) : (
                                 <Text style={styles.saveButtonText}>Submit for Review</Text>
                             )}
@@ -286,8 +289,8 @@ const VerificationScreen = ({ navigation, route }) => {
     );
 };
 
-const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: COLORS.white },
+const createStyles = (colors) => StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.white },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     header: {
         flexDirection: 'row',
@@ -295,37 +298,37 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 16,
         paddingVertical: 12,
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
     },
     backButton: { padding: 4 },
-    headerTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.white },
+    headerTitle: { fontSize: 18, fontWeight: 'bold', color: colors.white },
     content: { flex: 1 },
     scrollContent: { padding: 20 },
     infoBox: {
         flexDirection: 'row',
-        backgroundColor: `${COLORS.primary}10`,
+        backgroundColor: `${colors.primary}10`,
         padding: 16,
         borderRadius: 12,
         marginBottom: 24,
         alignItems: 'center',
         gap: 12,
     },
-    infoText: { flex: 1, fontSize: 13, color: COLORS.primary, lineHeight: 18, fontWeight: '500' },
+    infoText: { flex: 1, fontSize: 13, color: colors.primary, lineHeight: 18, fontWeight: '500' },
     section: { marginBottom: 32, paddingTop: 10 },
-    sectionTitle: { fontSize: 12, fontWeight: 'bold', color: COLORS.muted, marginBottom: 20, letterSpacing: 1 },
+    sectionTitle: { fontSize: 12, fontWeight: 'bold', color: colors.muted, marginBottom: 20, letterSpacing: 1 },
     inputGroup: { marginBottom: 20 },
-    inputLabel: { fontSize: 14, fontWeight: '600', color: COLORS.text, marginBottom: 8 },
+    inputLabel: { fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 8 },
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
         borderRadius: 12,
         paddingHorizontal: 16,
         borderWidth: 1,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
     },
     inputIcon: { marginRight: 12 },
-    input: { flex: 1, paddingVertical: 14, fontSize: 15, color: COLORS.text },
+    input: { flex: 1, paddingVertical: 14, fontSize: 15, color: colors.text },
 
     // Grid layout for photos
     row: {
@@ -338,20 +341,20 @@ const styles = StyleSheet.create({
     },
 
     pickerContainer: { marginBottom: 12 },
-    pickerLabel: { fontSize: 13, fontWeight: '600', color: COLORS.text, marginBottom: 8 },
+    pickerLabel: { fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 8 },
     imagePicker: {
         width: '100%',
         height: 120, // Slightly smaller since we have two side-by-side
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
         borderRadius: 12,
         borderWidth: 2,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
         borderStyle: 'dashed',
         overflow: 'hidden',
     },
-    imagePickerActive: { borderStyle: 'solid', borderColor: COLORS.primary },
+    imagePickerActive: { borderStyle: 'solid', borderColor: colors.primary },
     pickerPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 4 },
-    pickerText: { fontSize: 12, color: COLORS.muted },
+    pickerText: { fontSize: 12, color: colors.muted },
     previewImage: { width: '100%', height: '100%', resizeMode: 'cover' },
     editOverlay: {
         position: 'absolute',
@@ -366,7 +369,7 @@ const styles = StyleSheet.create({
     },
     footer: { marginTop: 10, paddingBottom: 40 },
     saveButton: {
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         paddingVertical: 16,
         borderRadius: 12,
         alignItems: 'center',
@@ -377,10 +380,10 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
     },
     disabledButton: { opacity: 0.7 },
-    saveButtonText: { color: COLORS.white, fontSize: 16, fontWeight: 'bold' },
+    saveButtonText: { color: colors.white, fontSize: 16, fontWeight: 'bold' },
     disclaimer: {
         textAlign: 'center',
-        color: COLORS.muted,
+        color: colors.muted,
         fontSize: 12,
         marginTop: 16,
         lineHeight: 18,

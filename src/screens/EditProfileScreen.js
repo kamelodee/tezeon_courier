@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     View,
     Text,
@@ -15,10 +15,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { COLORS } from '../theme/colors';
 import courierApi from '../services/courierApi';
+import { useTheme } from '../theme/ThemeContext';
 
 const EditProfileScreen = ({ navigation, route }) => {
+    const theme_hook = useTheme();
+    const colors = theme_hook?.colors ?? {};
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const { profile } = route.params;
 
     const [loading, setLoading] = useState(false);
@@ -169,7 +172,7 @@ const EditProfileScreen = ({ navigation, route }) => {
             <Ionicons
                 name={icon}
                 size={24}
-                color={vehicleType === type ? COLORS.white : COLORS.primary}
+                color={vehicleType === type ? colors.white : colors.primary}
             />
             <Text style={[
                 styles.vehicleLabel,
@@ -196,12 +199,12 @@ const EditProfileScreen = ({ navigation, route }) => {
                             style={styles.documentPreview}
                         />
                         <View style={styles.editBadge}>
-                            <Ionicons name="pencil" size={12} color={COLORS.white} />
+                            <Ionicons name="pencil" size={12} color={colors.white} />
                         </View>
                     </>
                 ) : (
                     <View style={styles.documentPlaceholder}>
-                        <Ionicons name="camera" size={24} color={COLORS.muted} />
+                        <Ionicons name="camera" size={24} color={colors.muted} />
                         <Text style={styles.documentPlaceholderText}>Upload</Text>
                     </View>
                 )}
@@ -213,7 +216,7 @@ const EditProfileScreen = ({ navigation, route }) => {
         <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+                    <Ionicons name="arrow-back" size={24} color={colors.white} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Edit Profile</Text>
                 <View style={{ width: 24 }} />
@@ -228,7 +231,7 @@ const EditProfileScreen = ({ navigation, route }) => {
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>CONTACT INFORMATION</Text>
                         <View style={styles.inputContainer}>
-                            <Ionicons name="call-outline" size={20} color={COLORS.muted} style={styles.inputIcon} />
+                            <Ionicons name="call-outline" size={20} color={colors.muted} style={styles.inputIcon} />
                             <TextInput
                                 style={styles.input}
                                 placeholder="Phone Number"
@@ -298,12 +301,12 @@ const EditProfileScreen = ({ navigation, route }) => {
                                 <>
                                     <Image source={{ uri: vehiclePhoto }} style={styles.vehiclePhotoPreview} />
                                     <View style={styles.editBadgeLarge}>
-                                        <Ionicons name="pencil" size={16} color={COLORS.white} />
+                                        <Ionicons name="pencil" size={16} color={colors.white} />
                                     </View>
                                 </>
                             ) : (
                                 <View style={styles.vehiclePhotoPlaceholder}>
-                                    <Ionicons name="camera" size={32} color={COLORS.muted} />
+                                    <Ionicons name="camera" size={32} color={colors.muted} />
                                     <Text style={styles.vehiclePhotoPlaceholderText}>Add vehicle photo</Text>
                                 </View>
                             )}
@@ -317,7 +320,7 @@ const EditProfileScreen = ({ navigation, route }) => {
                         <View style={styles.inputGroup}>
                             <Text style={styles.label}>NIA Number</Text>
                             <View style={styles.inputContainer}>
-                                <Ionicons name="card-outline" size={20} color={COLORS.muted} style={styles.inputIcon} />
+                                <Ionicons name="card-outline" size={20} color={colors.muted} style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
                                     placeholder="GHA-123456789-0"
@@ -349,7 +352,7 @@ const EditProfileScreen = ({ navigation, route }) => {
                         <View style={styles.inputGroup}>
                             <Text style={styles.label}>License Number</Text>
                             <View style={styles.inputContainer}>
-                                <Ionicons name="document-outline" size={20} color={COLORS.muted} style={styles.inputIcon} />
+                                <Ionicons name="document-outline" size={20} color={colors.muted} style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
                                     placeholder="Your license number"
@@ -376,7 +379,7 @@ const EditProfileScreen = ({ navigation, route }) => {
 
                     {/* Info Box */}
                     <View style={styles.infoBox}>
-                        <Ionicons name="shield-checkmark" size={20} color={COLORS.primary} />
+                        <Ionicons name="shield-checkmark" size={20} color={colors.primary} />
                         <Text style={styles.infoText}>
                             Document changes require re-verification by our team. You'll be notified once approved.
                         </Text>
@@ -388,7 +391,7 @@ const EditProfileScreen = ({ navigation, route }) => {
                         disabled={loading}
                     >
                         {loading ? (
-                            <ActivityIndicator color={COLORS.white} />
+                            <ActivityIndicator color={colors.white} />
                         ) : (
                             <Text style={styles.buttonText}>Save Changes</Text>
                         )}
@@ -401,10 +404,10 @@ const EditProfileScreen = ({ navigation, route }) => {
     );
 };
 
-const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: COLORS.background },
+const createStyles = (colors) => StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
     header: {
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         padding: 16,
         paddingVertical: 14,
         flexDirection: 'row',
@@ -419,7 +422,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    headerTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.white },
+    headerTitle: { fontSize: 18, fontWeight: 'bold', color: colors.white },
 
     scrollContent: { padding: 16 },
 
@@ -427,13 +430,13 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 11,
         fontWeight: '700',
-        color: COLORS.muted,
+        color: colors.muted,
         marginBottom: 16,
         letterSpacing: 1
     },
 
-    label: { fontSize: 13, color: COLORS.text, marginBottom: 8, fontWeight: '600' },
-    required: { color: COLORS.error },
+    label: { fontSize: 13, color: colors.text, marginBottom: 8, fontWeight: '600' },
+    required: { color: colors.error },
 
     inputGroup: { marginBottom: 12 },
     row: { flexDirection: 'row', marginBottom: 12 },
@@ -441,48 +444,48 @@ const styles = StyleSheet.create({
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderRadius: 12,
         paddingHorizontal: 14,
         height: 50,
         borderWidth: 1,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
     },
     inputIcon: { marginRight: 10 },
-    input: { flex: 1, color: COLORS.text, fontSize: 15 },
+    input: { flex: 1, color: colors.text, fontSize: 15 },
 
     vehicleScroll: { marginBottom: 16, paddingVertical: 4 },
     vehicleOption: {
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderRadius: 12,
         marginRight: 10,
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
         minWidth: 85,
     },
     vehicleOptionSelected: {
-        backgroundColor: COLORS.primary,
-        borderColor: COLORS.primary,
+        backgroundColor: colors.primary,
+        borderColor: colors.primary,
     },
-    vehicleLabel: { fontSize: 11, color: COLORS.primary, marginTop: 4, fontWeight: '600' },
-    vehicleLabelSelected: { color: COLORS.white },
+    vehicleLabel: { fontSize: 11, color: colors.primary, marginTop: 4, fontWeight: '600' },
+    vehicleLabelSelected: { color: colors.white },
 
     // Vehicle Photo
     vehiclePhotoPicker: {
         height: 120,
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderRadius: 12,
         borderWidth: 2,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
         borderStyle: 'dashed',
         overflow: 'hidden',
     },
     vehiclePhotoPickerActive: {
         borderStyle: 'solid',
-        borderColor: COLORS.primary,
+        borderColor: colors.primary,
     },
     vehiclePhotoPlaceholder: {
         flex: 1,
@@ -491,7 +494,7 @@ const styles = StyleSheet.create({
     },
     vehiclePhotoPlaceholderText: {
         fontSize: 13,
-        color: COLORS.muted,
+        color: colors.muted,
         marginTop: 8,
     },
     vehiclePhotoPreview: {
@@ -522,21 +525,21 @@ const styles = StyleSheet.create({
     documentLabel: {
         fontSize: 12,
         fontWeight: '600',
-        color: COLORS.text,
+        color: colors.text,
         marginBottom: 6,
     },
     documentPicker: {
         height: 90,
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
         borderRadius: 12,
         borderWidth: 2,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
         borderStyle: 'dashed',
         overflow: 'hidden',
     },
     documentPickerActive: {
         borderStyle: 'solid',
-        borderColor: COLORS.primary,
+        borderColor: colors.primary,
     },
     documentPlaceholder: {
         flex: 1,
@@ -545,7 +548,7 @@ const styles = StyleSheet.create({
     },
     documentPlaceholderText: {
         fontSize: 11,
-        color: COLORS.muted,
+        color: colors.muted,
         marginTop: 4,
     },
     documentPreview: {
@@ -568,7 +571,7 @@ const styles = StyleSheet.create({
     // Info box
     infoBox: {
         flexDirection: 'row',
-        backgroundColor: `${COLORS.primary}10`,
+        backgroundColor: `${colors.primary}10`,
         padding: 14,
         borderRadius: 12,
         gap: 10,
@@ -578,24 +581,24 @@ const styles = StyleSheet.create({
     infoText: {
         flex: 1,
         fontSize: 12,
-        color: COLORS.primary,
+        color: colors.primary,
         lineHeight: 18,
     },
 
     updateButton: {
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         height: 54,
         borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: COLORS.primary,
+        shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 8,
         elevation: 4,
     },
     buttonDisabled: { opacity: 0.7 },
-    buttonText: { color: COLORS.white, fontSize: 16, fontWeight: 'bold' },
+    buttonText: { color: colors.white, fontSize: 16, fontWeight: 'bold' },
 });
 
 export default EditProfileScreen;
