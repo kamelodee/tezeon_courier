@@ -10,6 +10,7 @@ import {
     Image,
     Switch,
     RefreshControl,
+    Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -446,6 +447,12 @@ const ProfileScreen = ({ navigation }) => {
                         title="Terms & Conditions"
                         onPress={() => navigation.navigate('Terms')}
                     />
+                    <MenuItem
+                        icon="shield-checkmark-outline"
+                        title="Privacy Policy"
+                        subtitle="Location & data policies"
+                        onPress={() => Linking.openURL('https://tezeon.com/privacy/driver')}
+                    />
                     {/* Dark Mode row */}
                     <View style={[s.menuRow, { borderBottomWidth: 0 }]}>
                         <View style={[s.menuIconWrap, { backgroundColor: `${colors.secondary}18` }]}>
@@ -471,6 +478,29 @@ const ProfileScreen = ({ navigation }) => {
                 >
                     <Ionicons name="log-out-outline" size={20} color="#EF4444" />
                     <Text style={s.logoutText}>Sign Out</Text>
+                </TouchableOpacity>
+
+                {/* ── Account Deletion Request (Google Play Compliance) ── */}
+                <TouchableOpacity
+                    style={{ paddingVertical: 12, alignItems: 'center' }}
+                    onPress={() => {
+                        Alert.alert(
+                            'Request Account Deletion',
+                            'Are you sure you want to request deletion of your Tezeon Driver account and personal data? You will be directed to our data deletion portal, or you can email privacy@tezeon.com.',
+                            [
+                                { text: 'Cancel', style: 'cancel' },
+                                {
+                                    text: 'Continue to Portal',
+                                    style: 'destructive',
+                                    onPress: () => Linking.openURL('https://tezeon.com/privacy/driver#account-deletion'),
+                                },
+                            ]
+                        );
+                    }}
+                >
+                    <Text style={{ fontSize: 13, color: '#EF4444', fontWeight: '600' }}>
+                        Request Account Deletion
+                    </Text>
                 </TouchableOpacity>
 
                 <Text style={[s.version, { color: colors.muted }]}>Tezeon Driver · v1.0.0</Text>

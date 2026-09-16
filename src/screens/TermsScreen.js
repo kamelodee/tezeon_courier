@@ -66,12 +66,12 @@ const sections = [
     },
     {
         title: '7. Privacy and Data',
-        content: `We collect and use your data as follows:
-• Location data to assign and track deliveries
-• Personal information for verification
-• Delivery history for performance tracking
-• This data is protected and not sold to third parties
-• You can request data deletion by contacting support`
+        content: `We collect and process your personal data in accordance with our Tezeon Driver Privacy Policy (https://tezeon.com/privacy/driver):
+• Location data (foreground and background) to match nearby orders and enable live delivery tracking for customers
+• Identity information (Ghana Card, driver's license) for account verification and platform trust
+• Delivery history and performance metrics to calculate earnings and payouts
+• Your data is encrypted and never sold to third parties
+• You can request account and data deletion at any time via Profile > Request Account Deletion or at https://tezeon.com/privacy/driver#account-deletion`
     },
     {
         title: '8. Liability',
