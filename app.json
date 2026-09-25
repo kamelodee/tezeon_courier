@@ -19,7 +19,6 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.tezeon.driver",
-      "versionCode": 1,
       "edgeToEdgeEnabled": true,
       "config": {
         "googleMaps": {
