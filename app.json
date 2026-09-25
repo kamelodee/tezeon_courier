@@ -72,7 +72,8 @@
         "expo-image-picker",
         {
           "photosPermission": "Tezeon Driver needs access to your photos to upload verification documents and vehicle photos.",
-          "cameraPermission": "Tezeon Driver uses your camera to take verification documents and proof of delivery photos."
+          "cameraPermission": "Tezeon Driver uses your camera to take verification documents and proof of delivery photos.",
+          "microphonePermission": false
         }
       ],
       "expo-font"
