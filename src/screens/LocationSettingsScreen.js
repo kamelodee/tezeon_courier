@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import backgroundService from '../services/backgroundService';
+import { ensureBackgroundLocationDisclosure } from '../utils/locationDisclosure';
 import { useTheme } from '../theme/ThemeContext';
 
 const LOCATION_SETTINGS_KEY = 'location_settings';
@@ -114,6 +115,12 @@ const LocationSettingsScreen = ({ navigation }) => {
                 await requestForegroundPermission();
                 return;
             }
+
+            // Same prominent disclosure the service shows. This button reaches
+            // the system prompt without going through backgroundService, so
+            // without this it was a second, undisclosed route to the prompt.
+            const disclosed = await ensureBackgroundLocationDisclosure();
+            if (!disclosed) return;
 
             const { status } = await Location.requestBackgroundPermissionsAsync();
             setBackgroundPermission(status);

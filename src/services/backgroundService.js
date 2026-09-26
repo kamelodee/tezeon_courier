@@ -1,5 +1,6 @@
 import * as TaskManager from 'expo-task-manager';
 import * as Location from 'expo-location';
+import { ensureBackgroundLocationDisclosure } from '../utils/locationDisclosure';
 import courierApi from './courierApi';
 import { Platform } from 'react-native';
 
@@ -53,6 +54,19 @@ class BackgroundService {
             const { status: bgStatus } = await Location.getBackgroundPermissionsAsync();
 
             if (bgStatus !== 'granted') {
+                // Google Play requires a prominent disclosure BEFORE this
+                // prompt, and the permissions declaration video has to show
+                // it. Both entry points (Dashboard go-online and Location
+                // Settings) reach the prompt through here, so it is gated in
+                // one place rather than duplicated per screen.
+                const disclosed = await ensureBackgroundLocationDisclosure();
+                if (!disclosed) {
+                    return {
+                        success: false,
+                        error: 'Background location is needed to receive jobs and keep customers updated while you ride.',
+                    };
+                }
+
                 const { status: newBgStatus } = await Location.requestBackgroundPermissionsAsync();
 
                 if (newBgStatus !== 'granted') {
