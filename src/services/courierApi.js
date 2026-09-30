@@ -210,6 +210,8 @@ class CourierAPI {
                 const data = await response.json();
                 if (data.access) {
                     await AsyncStorage.setItem('authToken', data.access);
+                    // The server rotates refresh tokens: keep the NEW one or the next refresh fails.
+                    if (data.refresh) await AsyncStorage.setItem('refreshToken', data.refresh);
                     if (__DEV__) console.log('✅ Token refreshed successfully');
                     return true;
                 }
