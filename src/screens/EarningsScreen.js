@@ -262,7 +262,7 @@ const EarningsScreen = ({ navigation }) => {
                                 </Text>
                                 <TouchableOpacity
                                     style={styles.cashOutButton}
-                                    onPress={() => navigation.navigate('Payout', { balance: summary?.total || 0 })}
+                                    onPress={() => navigation.navigate('Payout')}
                                 >
                                     <Text style={styles.cashOutButtonText}>Cash Out Now</Text>
                                     <Ionicons name="arrow-forward" size={16} color={colors.primary} />
@@ -282,9 +282,9 @@ const EarningsScreen = ({ navigation }) => {
                                     <Text style={styles.itemValue}>₵{parseFloat(summary?.this_month || 0).toFixed(2)}</Text>
                                 </View>
                                 <View style={styles.summaryItem}>
-                                    <Text style={styles.itemLabel}>Pending Payout</Text>
+                                    <Text style={styles.itemLabel}>Can cash out</Text>
                                     <Text style={[styles.itemValue, { color: '#FFD700' }]}>
-                                        ₵{parseFloat(summary?.pending_payout || 0).toFixed(2)}
+                                        ₵{parseFloat(summary?.available_for_payout || 0).toFixed(2)}
                                     </Text>
                                 </View>
                             </View>

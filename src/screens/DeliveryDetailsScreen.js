@@ -199,6 +199,9 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
             if (response.success) {
                 loadDeliveryDetails();
                 Alert.alert('Success', 'Status updated successfully');
+            } else if (action === 'accept' && /already taken/i.test(response.error || '')) {
+                // another rider got there first: nothing to do on this job any more
+                Alert.alert('Job taken', response.error, [{ text: 'OK', onPress: () => navigation.goBack() }]);
             } else {
                 Alert.alert('Error', response.error || 'Failed to update status');
             }
@@ -227,6 +230,16 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
 
         if (!recipientSignature && !deliveryPhoto) {
             Alert.alert('Proof Required', 'Please provide either a signature or a photo proof.');
+            return;
+        }
+
+        // Cash on delivery: the cash counts against the rider's wallet the moment this completes,
+        // so it must be confirmed first (this was optional before).
+        if (delivery?.is_cash_on_delivery && parseFloat(delivery?.cod_amount || 0) > 0 && !codCollected) {
+            Alert.alert(
+                'Collect the cash first',
+                `Collect ₵${parseFloat(delivery.cod_amount).toFixed(2)} from the customer and tap "Confirm Collection" before completing.`
+            );
             return;
         }
 
@@ -267,7 +280,7 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                     { text: 'OK', onPress: () => navigation.goBack() }
                 ]);
             } else {
-                Alert.alert('Error', response.data?.error || 'Failed to complete delivery');
+                Alert.alert('Could not complete', response.error || response.data?.error || 'Failed to complete delivery');
             }
         } catch (error) {
             console.error('Complete delivery error:', error);
@@ -292,7 +305,7 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
                     { text: 'OK', onPress: () => navigation.goBack() }
                 ]);
             } else {
-                Alert.alert('Error', response.data?.error || 'Failed to update status');
+                Alert.alert('Error', response.error || response.data?.error || 'Failed to update status');
             }
         } catch (error) {
             Alert.alert('Error', 'An error occurred');
@@ -301,31 +314,22 @@ const DeliveryDetailsScreen = ({ route, navigation }) => {
         }
     };
 
+    // Proof of delivery must be taken at the door: camera only. A photo from the gallery could be anything.
     const pickImage = async () => {
-        const launch = async (useCamera) => {
-            const fn = useCamera
-                ? ImagePicker.launchCameraAsync
-                : ImagePicker.launchImageLibraryAsync;
-            const result = await fn({
+        try {
+            const perm = await ImagePicker.requestCameraPermissionsAsync();
+            if (!perm.granted) {
+                Alert.alert('Camera needed', 'Allow camera access to take the proof-of-delivery photo.');
+                return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: true,
-                aspect: [4, 3],
-                quality: 0.8,
+                allowsEditing: false,
+                quality: 0.6,          // smaller upload on mobile data; still clear enough as proof
             });
             if (!result.canceled) setDeliveryPhoto(result.assets[0].uri);
-        };
-
-        if (Platform.OS === 'ios') {
-            ActionSheetIOS.showActionSheetWithOptions(
-                { options: ['Cancel', 'Take Photo', 'Choose from Library'], cancelButtonIndex: 0 },
-                (i) => { if (i === 1) launch(true); if (i === 2) launch(false); }
-            );
-        } else {
-            Alert.alert('Add Photo', 'Choose source', [
-                { text: 'Camera', onPress: () => launch(true) },
-                { text: 'Gallery', onPress: () => launch(false) },
-                { text: 'Cancel', style: 'cancel' },
-            ]);
+        } catch (e) {
+            Alert.alert('Camera error', 'Could not open the camera. Try again.');
         }
     };
 
