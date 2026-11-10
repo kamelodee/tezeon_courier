@@ -364,7 +364,7 @@ const ProfileScreen = ({ navigation }) => {
                 {parseFloat(earnings?.pending_payout || 0) > 0 && (
                     <TouchableOpacity
                         style={[s.noticeCard, { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}30` }]}
-                        onPress={() => navigation.navigate('Payout', { balance: earnings?.total })}
+                        onPress={() => navigation.navigate('Payout')}
                     >
                         <Ionicons name="wallet" size={22} color={colors.primary} />
                         <View style={{ flex: 1, marginLeft: 12 }}>

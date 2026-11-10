@@ -21,39 +21,44 @@ const PayoutScreen = ({ navigation, route }) => {
     const theme_hook = useTheme();
     const colors = theme_hook?.colors ?? {};
     const styles = useMemo(() => createStyles(colors), [colors]);
-    const { balance = 0 } = route.params || {};
+    // The withdrawable amount comes from the server (wallet minus cash you still hold minus requests
+    // waiting). It used to be passed in from the Earnings screen as lifetime earnings, which was wrong.
+    const [info, setInfo] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [loadingInfo, setLoadingInfo] = useState(true);
     const [amount, setAmount] = useState('');
     const [momoNumber, setMomoNumber] = useState('');
-    const [momoNetwork, setMomoNetwork] = useState('MTN'); // MTN, Vodafone, AirtelTigo
+    const [momoNetwork, setMomoNetwork] = useState('MTN'); // MTN, Telecel, AirtelTigo
     const [momoName, setMomoName] = useState('');
 
-    const [savedMomo, setSavedMomo] = useState(null);
+    const balance = parseFloat(info?.available || 0) || 0;
+    const minimum = parseFloat(info?.minimum || 10) || 10;
+    const cashHeld = parseFloat(info?.cash_to_remit || 0) || 0;
+    const waiting = (info?.requests || []).find(r => r.status === 'requested');
+
+    // the server stores Telecel under its old name
+    const toServerNetwork = (n) => (n === 'Telecel' ? 'Vodafone' : n);
+    const fromServerNetwork = (n) => (n === 'Vodafone' ? 'Telecel' : n || 'MTN');
 
     useEffect(() => {
-        loadPayoutSettings();
+        loadPayoutInfo();
     }, []);
 
-    const loadPayoutSettings = async () => {
-        setLoading(true);
-        try {
-            // In a real app, we'd fetch saved payout methods
-            const response = await courierApi.getProfile();
-            if (response.success && response.data.momo_number) {
-                setSavedMomo({
-                    number: response.data.momo_number,
-                    network: response.data.momo_network || 'MTN',
-                    name: response.data.momo_name || ''
-                });
-                setMomoNumber(response.data.momo_number);
-                setMomoNetwork(response.data.momo_network || 'MTN');
-                setMomoName(response.data.momo_name || '');
+    const loadPayoutInfo = async () => {
+        setLoadingInfo(true);
+        const response = await courierApi.getPayoutInfo();
+        if (response.success) {
+            setInfo(response.data);
+            const last = response.data?.last_momo;
+            if (last) {
+                setMomoNumber(prev => prev || last.number);
+                setMomoNetwork(fromServerNetwork(last.network));
+                setMomoName(prev => prev || last.name || '');
             }
-        } catch (error) {
-            console.error('Load payout settings error:', error);
-        } finally {
-            setLoading(false);
+        } else {
+            Alert.alert('Could not load your balance', response.error || 'Please try again.');
         }
+        setLoadingInfo(false);
     };
 
     const handleRequestPayout = async () => {
@@ -64,25 +69,30 @@ const PayoutScreen = ({ navigation, route }) => {
             return;
         }
 
-        if (payoutAmount > balance) {
-            Alert.alert('Insufficient Balance', `You only have ₵${balance.toFixed(2)} available.`);
+        if (waiting) {
+            Alert.alert('Payout already waiting', 'You can ask again once your current request has been paid.');
             return;
         }
 
-        if (payoutAmount < 10) {
-            Alert.alert('Minimum Amount', 'The minimum payout amount is ₵10.00');
+        if (payoutAmount > balance) {
+            Alert.alert('Insufficient Balance', `You can withdraw up to ₵${balance.toFixed(2)}.`);
+            return;
+        }
+
+        if (payoutAmount < minimum) {
+            Alert.alert('Minimum Amount', `The minimum payout amount is ₵${minimum.toFixed(2)}`);
             return;
         }
 
         const digits = momoNumber.replace(/\D/g, '');
-        if (!digits || digits.length < 9 || digits.length > 12) {
-            Alert.alert('Error', 'Please enter a valid Mobile Money number (9-12 digits)');
+        if (!/^(0[235]\d{8}|233[235]\d{8})$/.test(digits)) {
+            Alert.alert('Check the number', 'Enter a Ghana mobile money number, e.g. 024 123 4567.');
             return;
         }
 
         Alert.alert(
             'Confirm Payout',
-            `Are you sure you want to withdraw ₵${payoutAmount.toFixed(2)} to ${momoNumber} (${momoNetwork})?`,
+            `Ask Tezeon to send ₵${payoutAmount.toFixed(2)} to ${momoNumber} (${momoNetwork})?`,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
@@ -93,15 +103,18 @@ const PayoutScreen = ({ navigation, route }) => {
                             const response = await courierApi.requestPayout({
                                 amount: payoutAmount,
                                 momo_number: momoNumber,
-                                momo_network: momoNetwork,
+                                momo_network: toServerNetwork(momoNetwork),
                                 momo_name: momoName
                             });
 
                             if (response.success) {
+                                // Honest: a person sends it. No promised time we cannot keep.
+                                setAmount('');
+                                loadPayoutInfo();
                                 Alert.alert(
-                                    'Success!',
-                                    'Your payout request has been received and is being processed. Funds usually arrive within 24 hours.',
-                                    [{ text: 'Great', onPress: () => navigation.goBack() }]
+                                    'Request sent',
+                                    'Tezeon will send the money to your MoMo. It shows as Paid here, with the transaction ID, once it has been sent.',
+                                    [{ text: 'OK' }]
                                 );
                             } else {
                                 Alert.alert('Request Failed', response.error || 'Something went wrong');
@@ -153,8 +166,24 @@ const PayoutScreen = ({ navigation, route }) => {
                     {/* Balance Banner */}
                     <View style={styles.balanceCard}>
                         <Text style={styles.balanceLabel}>Available for Cashout</Text>
-                        <Text style={styles.balanceAmount}>₵{parseFloat(balance).toFixed(2)}</Text>
+                        {loadingInfo
+                            ? <ActivityIndicator style={{ marginTop: 12 }} color={colors.primary} />
+                            : <Text style={styles.balanceAmount}>₵{balance.toFixed(2)}</Text>}
+                        {cashHeld > 0 && (
+                            <Text style={styles.balanceNote}>
+                                Cash you collected (₵{cashHeld.toFixed(2)}) is taken off first.
+                            </Text>
+                        )}
                     </View>
+
+                    {waiting && (
+                        <View style={styles.waitingBox}>
+                            <Ionicons name="time-outline" size={20} color={colors.warning || '#F59E0B'} />
+                            <Text style={styles.waitingText}>
+                                ₵{waiting.amount} to {waiting.network} ••{waiting.number_last4} is waiting to be sent.
+                            </Text>
+                        </View>
+                    )}
 
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>WITHDRAWAL AMOUNT</Text>
@@ -170,7 +199,7 @@ const PayoutScreen = ({ navigation, route }) => {
                             />
                             <TouchableOpacity
                                 style={styles.maxButton}
-                                onPress={() => setAmount(balance.toString())}
+                                onPress={() => setAmount(balance.toFixed(2))}
                             >
                                 <Text style={styles.maxButtonText}>MAX</Text>
                             </TouchableOpacity>
@@ -217,17 +246,40 @@ const PayoutScreen = ({ navigation, route }) => {
                     <View style={styles.infoBox}>
                         <Ionicons name="information-circle" size={20} color={colors.primary} />
                         <Text style={styles.infoText}>
-                            Payouts are processed daily. Please ensure your MoMo details are correct to avoid delays.
+                            Tezeon sends payouts by mobile money. Check the number and name: money sent to a wrong number cannot be taken back.
                         </Text>
                     </View>
+
+                    {(info?.requests || []).length > 0 && (
+                        <View style={[styles.section, { marginTop: 24 }]}>
+                            <Text style={styles.sectionTitle}>YOUR PAYOUTS</Text>
+                            {info.requests.map(r => (
+                                <View key={r.id} style={styles.historyRow}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.historyAmount}>₵{r.amount}</Text>
+                                        <Text style={styles.historyMeta}>
+                                            {new Date(r.created_at).toLocaleDateString()} · {fromServerNetwork(r.network)} ••{r.number_last4}
+                                            {r.reference ? ` · Ref ${r.reference}` : ''}
+                                        </Text>
+                                        {!!r.note && <Text style={styles.historyMeta}>{r.note}</Text>}
+                                    </View>
+                                    <Text style={[styles.historyStatus,
+                                        r.status === 'paid' && { color: colors.success || '#10B981' },
+                                        r.status === 'rejected' && { color: colors.danger || '#EF4444' }]}>
+                                        {r.status === 'requested' ? 'Waiting' : r.status === 'paid' ? 'Paid' : 'Rejected'}
+                                    </Text>
+                                </View>
+                            ))}
+                        </View>
+                    )}
                 </ScrollView>
             </KeyboardAvoidingView>
 
             <View style={styles.footer}>
                 <TouchableOpacity
-                    style={[styles.payoutButton, (loading || !amount) && styles.buttonDisabled]}
+                    style={[styles.payoutButton, (loading || !amount || !!waiting) && styles.buttonDisabled]}
                     onPress={handleRequestPayout}
-                    disabled={loading || !amount}
+                    disabled={loading || !amount || !!waiting}
                 >
                     {loading ? (
                         <ActivityIndicator color={colors.white} />
@@ -279,6 +331,13 @@ const createStyles = (colors) => StyleSheet.create({
     },
     balanceLabel: { fontSize: 13, color: colors.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
     balanceAmount: { fontSize: 36, fontWeight: 'bold', color: colors.text, marginTop: 8 },
+    balanceNote: { fontSize: 12, color: colors.muted, marginTop: 8, textAlign: 'center' },
+    waitingBox: { flexDirection: 'row', gap: 10, alignItems: 'center', padding: 14, borderRadius: 12, marginBottom: 24, backgroundColor: '#FEF3C7' },
+    waitingText: { flex: 1, fontSize: 13, color: '#92400E', fontWeight: '600' },
+    historyRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: 12, padding: 14, marginBottom: 8 },
+    historyAmount: { fontSize: 16, fontWeight: '700', color: colors.text },
+    historyMeta: { fontSize: 12, color: colors.muted, marginTop: 2 },
+    historyStatus: { fontSize: 13, fontWeight: '700', color: '#B45309' },
 
     section: { marginBottom: 24 },
     sectionTitle: { fontSize: 11, fontWeight: '700', color: colors.muted, marginBottom: 16, letterSpacing: 1 },

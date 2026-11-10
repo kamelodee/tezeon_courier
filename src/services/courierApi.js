@@ -109,8 +109,10 @@ class CourierAPI {
 
     async getHeaders(options = {}) {
         const token = await this.getAuthToken();
+        // A FormData body sets its own multipart Content-Type (with the boundary); never force JSON on it
+        const isForm = typeof FormData !== 'undefined' && options.body instanceof FormData;
         const headers = {
-            'Content-Type': 'application/json',
+            ...(isForm ? {} : { 'Content-Type': 'application/json' }),
             ...(options.headers || {})
         };
 
@@ -510,21 +512,14 @@ class CourierAPI {
     }
 
     async completeDelivery(id, formData) {
+        // Goes through request() so an expired token is refreshed instead of failing at the door, and a
+        // non-JSON reply (e.g. a photo too large for the server) becomes a readable message, not a crash.
         try {
-            // FormData requires bypassing JSON content-type
-            const token = await this.getAuthToken();
-            const url = `${this.baseURL}${COURIER_URL}/deliveries/${id}/complete/`;
-
-            const response = await fetch(url, {
+            const data = await this.request(`${COURIER_URL}/deliveries/${id}/complete/`, {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
-                body: formData
+                body: formData,
             });
-
-            const data = await response.json();
-            return { success: response.ok, data };
+            return { success: true, data };
         } catch (error) {
             return { success: false, error: error.message };
         }
@@ -584,6 +579,16 @@ class CourierAPI {
             return { success: true, data: data.results || data };
         } catch (error) {
             return { success: false, data: [] };
+        }
+    }
+
+    /** What can be withdrawn now, past payout requests and the last MoMo details used. */
+    async getPayoutInfo() {
+        try {
+            const res = await this.request(`${COURIER_URL}/earnings/payout/`);
+            return { success: true, data: res.data || res };
+        } catch (error) {
+            return { success: false, error: error.message };
         }
     }
 
